@@ -1,0 +1,1601 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0a0612" />
+<title>2A Kemp - Inspection Prep</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  html, body, #root { background:#000; color:#f5f5f7; min-height:100vh; -webkit-font-smoothing:antialiased; }
+  body { margin:0; padding:0; overscroll-behavior:none; }
+  .scrollbar-none::-webkit-scrollbar { display:none; }
+  .scrollbar-none { -ms-overflow-style:none; scrollbar-width:none; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="errbox" style="display:none;position:fixed;inset:0;background:#111;color:#f88;padding:20px;font:13px/1.5 monospace;overflow:auto;z-index:9999;white-space:pre-wrap;word-break:break-word"></div>
+<script>
+  window.addEventListener("error", function(e){
+    var b=document.getElementById("errbox");
+    b.style.display="block";
+    b.textContent="ERROR:\n"+(e.message||"")+"\n\nFile: "+(e.filename||"")+"\nLine: "+(e.lineno||"")+"\n\n"+((e.error&&e.error.stack)||"");
+  });
+  window.addEventListener("unhandledrejection", function(e){
+    var b=document.getElementById("errbox");
+    b.style.display="block";
+    b.textContent="PROMISE ERROR:\n"+(e.reason&&(e.reason.stack||e.reason.message)||String(e.reason));
+  });
+</script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback, useRef, useMemo } = React;
+
+// ============ INLINE ICONS (replaces lucide-react) ============
+const Ico = ({ d = [], size = 16, color = "currentColor", strokeWidth = 2, className = "", style = {}, fill = "none", ...rest }) =>
+  React.createElement("svg", {
+    xmlns: "http://www.w3.org/2000/svg",
+    width: size, height: size, viewBox: "0 0 24 24",
+    fill: fill, stroke: color, strokeWidth: strokeWidth,
+    strokeLinecap: "round", strokeLinejoin: "round",
+    className, style, ...rest
+  }, d.map((path, i) => React.createElement("path", { key: i, d: path })));
+
+const mk = (paths) => function IconComponent(props) {
+  const p = props || {};
+  return Ico({ ...p, d: paths, color: p.color || (p.style && p.style.color) || "currentColor" });
+};
+
+const Check       = mk(["M20 6 9 17l-5-5"]);
+const Circle      = mk(["M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20"]);
+const AlertCircle = mk(["M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20", "M12 8v4", "M12 16h.01"]);
+const Calendar    = mk(["M8 2v4", "M16 2v4", "M3 10h18", "M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"]);
+const ShoppingBag = mk(["M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z", "M3 6h18", "M16 10a4 4 0 0 1-8 0"]);
+const Wind        = mk(["M12.8 19.6A2 2 0 1 0 14 16H2", "M17.5 8a2.5 2.5 0 1 1 2 4H2", "M9.8 4.4A2 2 0 1 1 11 8H2"]);
+const Phone       = mk(["M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"]);
+const ChevronDown = mk(["m6 9 6 6 6-6"]);
+const ChevronUp   = mk(["m18 15-6-6-6 6"]);
+const RefreshCw   = mk(["M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8", "M21 3v5h-5", "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16", "M8 16H3v5"]);
+const Wifi        = mk(["M5 13a10 10 0 0 1 14 0", "M8.5 16.5a5 5 0 0 1 7 0", "M2 8.82a15 15 0 0 1 20 0", "M12 20h.01"]);
+const WifiOff     = mk(["M12 20h.01", "M8.5 16.42a5 5 0 0 1 7 0", "M2 8.82a15 15 0 0 1 4.17-2.65", "M10.66 5c4.01-.36 8.14.9 11.34 3.76", "M16.85 11.25a10 10 0 0 1 2.22 1.68", "M5 13a10 10 0 0 1 5.24-2.76", "m2 2 20 20"]);
+const Hammer      = mk(["m15 12-8.5 8.5a2.12 2.12 0 1 1-3-3L12 9", "M17.64 15 22 10.64", "m20.91 11.7-1.25-1.25c-.6-.6-.93-1.4-.93-2.25v-.86L16.01 4.6a5.56 5.56 0 0 0-3.94-1.64H9l.92.82A6.18 6.18 0 0 1 12 8.4v1.56l2 2h2.47l2.26 1.91"]);
+const Sparkles    = mk(["m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z", "M5 3v4", "M19 17v4", "M3 5h4", "M17 19h4"]);
+const Flower2     = mk(["M12 5a3 3 0 1 1 3 3m-3-3a3 3 0 1 0-3 3m3-3v1M9 8a3 3 0 1 0 3 3M9 8h1m5 0a3 3 0 1 1-3 3m3-3h-1m-2 3v-1", "M12 17v5", "M8 22h8"]);
+const Baby        = mk(["M9 12h.01", "M15 12h.01", "M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5", "M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5S14.5 8 13 8"]);
+const ArrowRight  = mk(["M5 12h14", "m12 5 7 7-7 7"]);
+const Pause       = mk(["M14 4v16", "M10 4v16"]);
+const Package     = mk(["m7.5 4.27 9 5.15", "M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z", "m3.3 7 8.7 5 8.7-5", "M12 22V12"]);
+const Car         = mk(["M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2", "M9 17h6", "M9 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0", "M19 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0"]);
+
+
+
+
+
+// ============ CONFIG ============
+const INSPECTION_DATE = new Date("2026-08-18T09:00:00");
+const POLL_MS = 6000;
+const JSONBLOB_API = "https://jsonblob.com/api/jsonBlob";
+const BLOB_ID_PARAM = "blob";
+
+// ============ DATA ============
+const PERSONS = [
+  { key: "belinda",  label: "Belinda",  color: "#ec4899", initial: "B",  role: "Coordinator" },
+  { key: "josh",     label: "Josh",     color: "#3b82f6", initial: "J",  role: "Repairs + heavy" },
+  { key: "desiree",  label: "Desiree",  color: "#10b981", initial: "D",  role: "Cleaning" },
+  { key: "jayden",   label: "Jayden",   color: "#f97316", initial: "Jy", role: "Floater · 15" },
+  { key: "ariannah", label: "Ariannah", color: "#06b6d4", initial: "A",  role: "Organise · 14" },
+  { key: "ollie",    label: "Ollie",    color: "#a3e635", initial: "O",  role: "Learner · 11" },
+  { key: "shared",   label: "Shared",   color: "#a855f7", initial: "S",  role: "All hands" },
+];
+
+// Timeline: Aug 10 (today) → Aug 18 (inspection)
+// Day 1 = Aug 10 · Day 2 = Aug 11 · Day 3 = Aug 12 (shed + tip run)
+// Day 4 = Aug 13 (garage bulk) · Day 5 = Aug 14 (carpet clean AM, cabin PM)
+// Day 6 = Aug 15 (rotating) · Day 7 = Aug 16 (final push — everything done)
+// Aug 17 = quick check only · Aug 18 = INSPECTION (all at cabin)
+
+const DAYS = [
+  {
+    day: 1, label: "Foundation", subtitle: "Bookings, clothes bagging, first blitz",
+    tasks: {
+      belinda: [
+        { id: "b1-1", text: "Book kennel for dog", critical: true, cat: "booking" },
+        { id: "b1-2", text: "Book holiday house cleaner (target Aug 17)", critical: true, cat: "booking" },
+        { id: "b1-3", text: "Book Nico's shots (cattery prerequisite)", critical: true, cat: "booking" },
+        { id: "b1-4", text: "Book cattery (after Nico's shots confirmed)", critical: true, cat: "booking" },
+        { id: "b1-5", text: "Rehome kitten — arrange", critical: true, cat: "booking" },
+        { id: "b1-6", text: "Submit CDU paperwork", critical: true, cat: "paperwork" },
+        { id: "b1-7", text: "Emails re: Noah's bookings", critical: true, cat: "paperwork" },
+        { id: "b1-8", text: "Book adbdoc appt — Belinda & Desiree (poss. antibiotics)", critical: true, cat: "paperwork" },
+        { id: "b1-9", text: "Bag up clothes I no longer wear", critical: false, cat: "declutter" },
+        { id: "b1-10", text: "Decide if gardener needed — book if yes", critical: false, cat: "booking" },
+      ],
+      josh: [
+        { id: "j1-1", text: "Pick up dog poop from backyard", critical: true, cat: "outdoor" },
+        { id: "j1-2", text: "Assess shed — plan for tip run Day 3", critical: false, cat: "declutter" },
+        { id: "j1-3", text: "Arrange ute for tip runs (spark plugs before use)", critical: true, cat: "car" },
+        { id: "j1-4", text: "Skirting board clean — whole house start", critical: false, cat: "clean" },
+        { id: "j1-5", text: "Remove cobwebs from ceilings throughout", critical: false, cat: "clean" },
+      ],
+      desiree: [
+        { id: "d1-1", text: "Comb everyone's hair with lice comb", critical: true, cat: "kids" },
+        { id: "d1-2", text: "Clean kitty litter trays thoroughly", critical: true, cat: "smell" },
+        { id: "d1-3", text: "Vacuum all carpets — full house", critical: false, cat: "clean" },
+        { id: "d1-4", text: "Sweep + mop all hard floors", critical: false, cat: "clean" },
+        { id: "d1-5", text: "Start washing catch-up", critical: false, cat: "laundry" },
+        { id: "d1-6", text: "Clean rubbish bins inside", critical: false, cat: "smell" },
+      ],
+      jayden: [
+        { id: "jy1-1", text: "Wall cleaning — lounge + hallway (magic eraser)", critical: false, cat: "clean" },
+        { id: "jy1-2", text: "Take rubbish out — help empty all bins", critical: true, cat: "declutter" },
+        { id: "jy1-3", text: "Help Belinda wherever needed", critical: false, cat: "declutter" },
+        { id: "jy1-4", text: "Tick off Ollie's tasks with him", critical: false, cat: "kids" },
+      ],
+      ariannah: [
+        { id: "a1-1", text: "Help Belinda bag up unwanted clothes", critical: false, cat: "declutter" },
+        { id: "a1-2", text: "Sort boys' room clothes + declutter", critical: true, cat: "declutter" },
+        { id: "a1-3", text: "Reduce visible clutter — main living areas", critical: true, cat: "declutter" },
+      ],
+      ollie: [
+        { id: "o1-1", text: "Sort my own clothes into keep/donate", critical: false, cat: "declutter" },
+        { id: "o1-2", text: "Put toys away in baskets", critical: false, cat: "declutter" },
+      ],
+      shared: [
+        { id: "s1-1", text: "Major clutter blitz — whole house", critical: true, cat: "declutter" },
+        { id: "s1-2", text: "Remove all visible rubbish piles", critical: true, cat: "declutter" },
+      ],
+    },
+  },
+  {
+    day: 2, label: "Repairs + Laundry Sort", subtitle: "Patch, paint, reduce washing machines",
+    tasks: {
+      belinda: [
+        { id: "b2-1", text: "After clothes bagged: put away my clothes with Ariannah + Dez", critical: false, cat: "declutter" },
+        { id: "b2-2", text: "Big shop: baskets, paint, patch, switch covers, bleach, weed spray, rug", critical: true, cat: "shopping" },
+        { id: "b2-3", text: "Buy new shower bottom rubber trim (puppy chewed)", critical: true, cat: "shopping" },
+        { id: "b2-4", text: "Buy metal strips for damaged carpet edges", critical: true, cat: "shopping" },
+        { id: "b2-5", text: "Arrange Kia oxygen sensors + spark plug (for sale prep)", critical: false, cat: "car" },
+        { id: "b2-6", text: "Buy automatic air freshener system", critical: false, cat: "shopping" },
+      ],
+      josh: [
+        { id: "j2-1", text: "Patch repairs — lounge, hallway, stairs", critical: true, cat: "repair" },
+        { id: "j2-2", text: "Chuck outdoor couch (torn to pieces) + restage", critical: true, cat: "outdoor" },
+        { id: "j2-3", text: "Sand previous lumpy patches smooth", critical: false, cat: "repair" },
+        { id: "j2-4", text: "Repair skirting — boys room, dining, lounge", critical: false, cat: "repair" },
+        { id: "j2-5", text: "Touch up paint around light switches", critical: false, cat: "repair" },
+        { id: "j2-6", text: "Repair cat-scratched garage door frame", critical: false, cat: "repair" },
+        { id: "j2-7", text: "Pull apart extra bed in boys' room (Nathaniel's)", critical: false, cat: "declutter" },
+      ],
+      desiree: [
+        { id: "d2-1", text: "Clean toilet — zero visible staining", critical: true, cat: "clean" },
+        { id: "d2-2", text: "Magic eraser bathroom walls", critical: false, cat: "clean" },
+        { id: "d2-3", text: "Scrub bathroom grout + bathtub", critical: false, cat: "clean" },
+        { id: "d2-4", text: "Check + clean toilet base edges", critical: false, cat: "clean" },
+        { id: "d2-5", text: "Washing — keep loads moving (2 & 3)", critical: false, cat: "laundry" },
+        { id: "d2-6", text: "Clean kitchen cupboard exteriors", critical: false, cat: "clean" },
+        { id: "d2-7", text: "Help Belinda + Ariannah put away clothes", critical: false, cat: "declutter" },
+      ],
+      jayden: [
+        { id: "jy2-1", text: "Wall cleaning continue — bedrooms + hall", critical: false, cat: "clean" },
+        { id: "jy2-2", text: "Help Josh with heavy furniture moves", critical: false, cat: "declutter" },
+        { id: "jy2-3", text: "Quick tidy sweep — all common areas", critical: false, cat: "declutter" },
+      ],
+      ariannah: [
+        { id: "a2-1", text: "Boys' room clothes: continue sorting + bagging", critical: true, cat: "declutter" },
+        { id: "a2-2", text: "Reduce bench clutter — kitchen + living", critical: false, cat: "declutter" },
+        { id: "a2-3", text: "Wardrobe: straighten cotton/storage presentation", critical: false, cat: "declutter" },
+      ],
+      ollie: [
+        { id: "o2-1", text: "Wipe low walls where I can reach", critical: false, cat: "clean" },
+        { id: "o2-2", text: "Help Jayden carry rubbish to bins", critical: false, cat: "declutter" },
+      ],
+      shared: [
+        { id: "s2-1", text: "LAUNDRY REDUCTION: scrap back-yard washer", critical: true, cat: "declutter" },
+        { id: "s2-2", text: "Fix black washer (get it to spin) OR remove", critical: true, cat: "declutter" },
+        { id: "s2-3", text: "Decide: replace stacked washer/dryer with combo unit", critical: false, cat: "declutter" },
+        { id: "s2-4", text: "Weed front garden", critical: false, cat: "outdoor" },
+        { id: "s2-5", text: "Side alley: cobwebs, weeds, butts", critical: false, cat: "outdoor" },
+      ],
+    },
+  },
+  {
+    day: 3, label: "Shed + Tip Run", subtitle: "Landlord needs shed open · big rubbish run",
+    tasks: {
+      belinda: [
+        { id: "b3-1", text: "Coordinate tip run — load list, hire trailer if needed", critical: true, cat: "declutter" },
+        { id: "b3-2", text: "Finish paying for cabin booking (West Beach)", critical: true, cat: "booking" },
+        { id: "b3-3", text: "Follow up: CDU paperwork, Noah's bookings", critical: false, cat: "paperwork" },
+      ],
+      josh: [
+        { id: "j3-1", text: "SHED CLEANOUT — everything out, sort keep/tip", critical: true, cat: "declutter" },
+        { id: "j3-2", text: "Load ute for tip run", critical: true, cat: "declutter" },
+        { id: "j3-3", text: "DO THE TIP RUN (with Jayden, hopefully Connor)", critical: true, cat: "declutter" },
+        { id: "j3-4", text: "Paint patched sections — hallway, lounge", critical: true, cat: "repair" },
+      ],
+      desiree: [
+        { id: "d3-1", text: "Bleach mould at ensuite shower base", critical: true, cat: "clean" },
+        { id: "d3-2", text: "Clean ensuite fan cover", critical: false, cat: "clean" },
+        { id: "d3-3", text: "Clean foundation stains outside ensuite", critical: false, cat: "clean" },
+        { id: "d3-4", text: "Scrub + bleach laundry grout", critical: false, cat: "clean" },
+        { id: "d3-5", text: "Clean all internal window glass", critical: false, cat: "clean" },
+        { id: "d3-6", text: "Continue washing catch-up", critical: false, cat: "laundry" },
+      ],
+      jayden: [
+        { id: "jy3-1", text: "SHED — help Josh clear everything out", critical: true, cat: "declutter" },
+        { id: "jy3-2", text: "TIP RUN — go with Josh (multiple loads)", critical: true, cat: "declutter" },
+        { id: "jy3-3", text: "Wall cleaning — bathroom + toilet doors", critical: false, cat: "clean" },
+      ],
+      ariannah: [
+        { id: "a3-1", text: "Girls' room: assess + organise cupboard", critical: false, cat: "declutter" },
+        { id: "a3-2", text: "Main bedroom: sort printer area + baskets", critical: false, cat: "declutter" },
+        { id: "a3-3", text: "Sort through what SHOULDN'T go to tip", critical: true, cat: "declutter" },
+      ],
+      ollie: [
+        { id: "o3-1", text: "Help carry small stuff from shed to ute", critical: false, cat: "declutter" },
+        { id: "o3-2", text: "Empty small bins around house", critical: false, cat: "declutter" },
+      ],
+      shared: [
+        { id: "s3-1", text: "SHED must be OPEN and CLEAR for inspection", critical: true, cat: "declutter" },
+        { id: "s3-2", text: "Front garden: rocks, tree bed, pots", critical: false, cat: "outdoor" },
+        { id: "s3-3", text: "Expose brick edging line cleanly", critical: false, cat: "outdoor" },
+      ],
+    },
+  },
+  {
+    day: 4, label: "Garage Bulk Day", subtitle: "ALL HANDS · sort keep/Facebook/tip/scrap",
+    tasks: {
+      belinda: [
+        { id: "b4-1", text: "Confirm ALL bookings (kennel, cattery, cleaner, cabin)", critical: true, cat: "booking" },
+        { id: "b4-2", text: "Post appliances on Facebook for FREE pickup", critical: true, cat: "declutter" },
+        { id: "b4-3", text: "Coordinate garage — direct sorting, keep everyone on task", critical: true, cat: "declutter" },
+        { id: "b4-4", text: "Plan kids packing + activities for cabin", critical: false, cat: "planning" },
+      ],
+      josh: [
+        { id: "j4-1", text: "GARAGE — heavy lifting, appliance move-out", critical: true, cat: "declutter" },
+        { id: "j4-2", text: "Second tip run if needed (garage leftovers)", critical: true, cat: "declutter" },
+        { id: "j4-3", text: "Sand, patch, paint ensuite door frame", critical: true, cat: "repair" },
+        { id: "j4-4", text: "Main bedroom: skirting chip + handle damage", critical: false, cat: "repair" },
+        { id: "j4-5", text: "Reattach loose board in main bedroom", critical: false, cat: "repair" },
+        { id: "j4-6", text: "Boys room: repair near wardrobe slider", critical: false, cat: "repair" },
+        { id: "j4-7", text: "Glue lifting carpet — boys room wardrobe", critical: false, cat: "repair" },
+      ],
+      desiree: [
+        { id: "d4-1", text: "GARAGE — sort with everyone, then oven deep clean", critical: true, cat: "declutter" },
+        { id: "d4-2", text: "Oven + stove + griller deep clean", critical: true, cat: "clean" },
+        { id: "d4-3", text: "Washing FULLY caught up by EOD", critical: true, cat: "laundry" },
+        { id: "d4-4", text: "Eucalyptus clean fridge exterior + sides", critical: false, cat: "clean" },
+        { id: "d4-5", text: "Clean window tracks + ledges", critical: false, cat: "clean" },
+        { id: "d4-6", text: "Girls room: vacuum, mirrors, wipe", critical: false, cat: "clean" },
+      ],
+      jayden: [
+        { id: "jy4-1", text: "GARAGE — all in, sort with the team", critical: true, cat: "declutter" },
+        { id: "jy4-2", text: "Load Facebook-pickup pile in accessible spot", critical: true, cat: "declutter" },
+        { id: "jy4-3", text: "Help with second tip run if Josh needs", critical: false, cat: "declutter" },
+      ],
+      ariannah: [
+        { id: "a4-1", text: "GARAGE — organiser role, decide categories", critical: true, cat: "declutter" },
+        { id: "a4-2", text: "Group similar items neatly for keep-pile", critical: true, cat: "declutter" },
+        { id: "a4-3", text: "Kids lounge: reset toys + blankets", critical: false, cat: "declutter" },
+      ],
+      ollie: [
+        { id: "o4-1", text: "GARAGE — help sort little things", critical: false, cat: "declutter" },
+        { id: "o4-2", text: "Fetch bins, carry small items", critical: false, cat: "declutter" },
+      ],
+      shared: [
+        { id: "s4-1", text: "Clean mattresses (NEEDS DRY TIME)", critical: true, cat: "smell" },
+        { id: "s4-2", text: "Kids lounge: pull queen mattress OFF couch → my wardrobe", critical: true, cat: "declutter" },
+        { id: "s4-3", text: "Get PROPER couch mattress (from garage) onto couch", critical: true, cat: "declutter" },
+        { id: "s4-4", text: "Foam mattress (girls' room) → on top, fold all up", critical: true, cat: "declutter" },
+        { id: "s4-5", text: "Hose bins + remove rubbish behind", critical: false, cat: "smell" },
+      ],
+    },
+  },
+  {
+    day: 5, label: "Carpet Clean → Cabin", subtitle: "Kids to school · carpet clean · pick up · cabin",
+    tasks: {
+      belinda: [
+        { id: "b5-1", text: "Morning: kids to school", critical: true, cat: "kids" },
+        { id: "b5-2", text: "RENT CARPET CLEANER — do full house", critical: true, cat: "clean" },
+        { id: "b5-3", text: "Groceries + cabin supplies", critical: true, cat: "shopping" },
+        { id: "b5-4", text: "Pack little kids for cabin", critical: true, cat: "kids" },
+        { id: "b5-5", text: "Pick up kids from school → drive to cabin", critical: true, cat: "kids" },
+        { id: "b5-6", text: "Confirm dog kennel drop-off", critical: true, cat: "booking" },
+        { id: "b5-7", text: "Sort all meals for cabin period", critical: false, cat: "planning" },
+      ],
+      josh: [
+        { id: "j5-1", text: "Report or cover broken drain grate out front", critical: true, cat: "report" },
+        { id: "j5-2", text: "Report broken toilet fan", critical: true, cat: "report" },
+        { id: "j5-3", text: "Install shower rubber trim (bought Day 2)", critical: true, cat: "repair" },
+        { id: "j5-4", text: "Install metal strips at carpet damage points", critical: true, cat: "repair" },
+        { id: "j5-5", text: "Reduce tyre marks on driveway", critical: false, cat: "outdoor" },
+        { id: "j5-6", text: "Garage skirting + wall near door", critical: false, cat: "repair" },
+      ],
+      desiree: [
+        { id: "d5-1", text: "Help Belinda with carpet cleaning", critical: true, cat: "clean" },
+        { id: "d5-2", text: "Paint over mould-stained laundry wall", critical: true, cat: "repair" },
+        { id: "d5-3", text: "Glue lifted laundry sink laminate", critical: false, cat: "repair" },
+        { id: "d5-4", text: "Twins room: scrub + magic eraser walls", critical: false, cat: "clean" },
+      ],
+      jayden: [
+        { id: "jy5-1", text: "Help move furniture for carpet cleaning", critical: true, cat: "clean" },
+        { id: "jy5-2", text: "Wall cleaning finish — anywhere remaining", critical: false, cat: "clean" },
+        { id: "jy5-3", text: "Yard rubbish sweep — butts + bits", critical: false, cat: "outdoor" },
+      ],
+      ariannah: [
+        { id: "a5-1", text: "Pack own cabin bag + help pack little kids", critical: true, cat: "kids" },
+        { id: "a5-2", text: "Final surface clear — kitchen + living", critical: true, cat: "declutter" },
+        { id: "a5-3", text: "Prepare visual staging for main rooms", critical: false, cat: "declutter" },
+      ],
+      ollie: [
+        { id: "o5-1", text: "Pack my own cabin bag", critical: true, cat: "kids" },
+        { id: "o5-2", text: "Help with little ones", critical: false, cat: "kids" },
+      ],
+      shared: [
+        { id: "s5-1", text: "Plant new plants + fill garden gaps", critical: false, cat: "outdoor" },
+        { id: "s5-2", text: "Add flowers to front pots", critical: false, cat: "outdoor" },
+      ],
+    },
+  },
+  {
+    day: 6, label: "Final Repairs + Staging", subtitle: "Adults rotating cabin ↔ house",
+    tasks: {
+      belinda: [
+        { id: "b6-1", text: "At cabin: little kids · comb hair (lice check)", critical: true, cat: "kids" },
+        { id: "b6-2", text: "House shift: smell check ALL rooms", critical: true, cat: "smell" },
+        { id: "b6-3", text: "House shift: air out all rooms thoroughly", critical: true, cat: "smell" },
+        { id: "b6-4", text: "Reattach bedroom flyscreen", critical: false, cat: "repair" },
+        { id: "b6-5", text: "Address bathroom flyscreen mesh", critical: false, cat: "repair" },
+        { id: "b6-6", text: "Main bedroom: baskets, declutter clothes", critical: false, cat: "declutter" },
+      ],
+      josh: [
+        { id: "j6-1", text: "Final patch blending — reduce contrast", critical: true, cat: "repair" },
+        { id: "j6-2", text: "Repair lounge skirting chip outside bedroom", critical: false, cat: "repair" },
+        { id: "j6-3", text: "Remove butterfly sticker residue above TV", critical: false, cat: "clean" },
+        { id: "j6-4", text: "Small hallway: corner damage + marks", critical: false, cat: "repair" },
+        { id: "j6-5", text: "Repair pink marks above coffee table", critical: false, cat: "repair" },
+        { id: "j6-6", text: "Fix love-heart marking above stair handrail", critical: false, cat: "repair" },
+        { id: "j6-7", text: "Repair + paint handrail", critical: false, cat: "repair" },
+      ],
+      desiree: [
+        { id: "d6-1", text: "FINAL vacuum all carpets", critical: true, cat: "clean" },
+        { id: "d6-2", text: "FINAL sweep + mop all floors", critical: true, cat: "clean" },
+        { id: "d6-3", text: "Remove ALL remaining cobwebs + moth eggs", critical: true, cat: "clean" },
+        { id: "d6-4", text: "Clean fans + fan covers throughout", critical: true, cat: "clean" },
+        { id: "d6-5", text: "Clean exhaust covers", critical: true, cat: "clean" },
+        { id: "d6-6", text: "Clean stair edges + carpet corners", critical: false, cat: "clean" },
+        { id: "d6-7", text: "Wipe all window frames", critical: false, cat: "clean" },
+      ],
+      jayden: [
+        { id: "jy6-1", text: "House shift: wall touch-ups Josh flags", critical: true, cat: "clean" },
+        { id: "jy6-2", text: "Clean wardrobe mirrors", critical: false, cat: "clean" },
+        { id: "jy6-3", text: "Remove blue pen — twins room door", critical: false, cat: "clean" },
+        { id: "jy6-4", text: "Toothpaste off bathroom door", critical: false, cat: "clean" },
+      ],
+      ariannah: [
+        { id: "a6-1", text: "House shift: FINAL declutter pass — all rooms", critical: true, cat: "declutter" },
+        { id: "a6-2", text: "Beds visually reset neatly", critical: true, cat: "declutter" },
+        { id: "a6-3", text: "Clear all visible surfaces", critical: true, cat: "declutter" },
+        { id: "a6-4", text: "Fold all blankets, arrange pillows", critical: false, cat: "declutter" },
+      ],
+      ollie: [
+        { id: "o6-1", text: "Cabin: help with little ones", critical: false, cat: "kids" },
+      ],
+      shared: [
+        { id: "s6-1", text: "INCENSE through whole house (afternoon)", critical: true, cat: "smell" },
+        { id: "s6-2", text: "Activate automatic air freshener sprays", critical: true, cat: "smell" },
+        { id: "s6-3", text: "Final pet area + litter clean", critical: true, cat: "smell" },
+        { id: "s6-4", text: "Move mother cat + babies to plan", critical: true, cat: "smell" },
+        { id: "s6-5", text: "Cover hallway bag/shoe section", critical: false, cat: "declutter" },
+      ],
+    },
+  },
+  {
+    day: 7, label: "Everything Done", subtitle: "Target: house 100% ready by tonight",
+    tasks: {
+      belinda: [
+        { id: "b7-1", text: "House shift: WALKTHROUGH — Repairs · Walls · Floors · Ceilings", critical: true, cat: "signoff" },
+        { id: "b7-2", text: "House shift: WALKTHROUGH — Windows · Clutter · Smell", critical: true, cat: "signoff" },
+        { id: "b7-3", text: "House shift: FINAL inspector-eyes walkthrough", critical: true, cat: "signoff" },
+        { id: "b7-4", text: "Photograph every room (proof)", critical: true, cat: "signoff" },
+        { id: "b7-5", text: "Confirm cattery + all cats/kitten removed", critical: true, cat: "booking" },
+        { id: "b7-6", text: "Confirm cleaner will come tomorrow (Aug 17)", critical: true, cat: "booking" },
+      ],
+      josh: [
+        { id: "j7-1", text: "Address ANY items flagged in walkthrough", critical: true, cat: "repair" },
+        { id: "j7-2", text: "Last paint touch-ups if needed", critical: true, cat: "repair" },
+        { id: "j7-3", text: "Final driveway presentation check", critical: false, cat: "outdoor" },
+      ],
+      desiree: [
+        { id: "d7-1", text: "Address ANY cleaning items flagged", critical: true, cat: "clean" },
+        { id: "d7-2", text: "Final bathroom drains check", critical: true, cat: "clean" },
+        { id: "d7-3", text: "Dust top edges everywhere", critical: false, cat: "clean" },
+      ],
+      jayden: [
+        { id: "jy7-1", text: "Help address any last things", critical: true, cat: "declutter" },
+        { id: "jy7-2", text: "Final rubbish sweep — inside + outside", critical: true, cat: "declutter" },
+      ],
+      ariannah: [
+        { id: "a7-1", text: "Address any staging items post-walkthrough", critical: true, cat: "declutter" },
+        { id: "a7-2", text: "Final basket check — no overflow anywhere", critical: false, cat: "declutter" },
+      ],
+      ollie: [
+        { id: "o7-1", text: "Cabin: keep little ones happy", critical: false, cat: "kids" },
+      ],
+      shared: [
+        { id: "s7-1", text: "SHED confirmed open + clear", critical: true, cat: "declutter" },
+        { id: "s7-2", text: "GARAGE confirmed presentable (containment achieved)", critical: true, cat: "declutter" },
+        { id: "s7-3", text: "All doors close, all switches work, all surfaces clear", critical: true, cat: "signoff" },
+        { id: "s7-4", text: "Aug 17: cleaner comes · quick check only", critical: true, cat: "signoff" },
+        { id: "s7-5", text: "Aug 18 (INSPECTION): all at cabin · final sprays activated", critical: true, cat: "smell" },
+      ],
+    },
+  },
+];
+
+const CAT_META = {
+  booking: { icon: Phone, label: "Booking" },
+  planning: { icon: Calendar, label: "Planning" },
+  shopping: { icon: ShoppingBag, label: "Shopping" },
+  repair: { icon: Hammer, label: "Repair" },
+  clean: { icon: Sparkles, label: "Clean" },
+  declutter: { icon: Package, label: "Declutter" },
+  smell: { icon: Wind, label: "Smell" },
+  outdoor: { icon: Flower2, label: "Outdoor" },
+  laundry: { icon: Sparkles, label: "Laundry" },
+  kids: { icon: Baby, label: "Kids" },
+  signoff: { icon: Check, label: "Sign-off" },
+  report: { icon: AlertCircle, label: "Report" },
+  paperwork: { icon: Calendar, label: "Paperwork" },
+  car: { icon: Car, label: "Car/Ute" },
+};
+
+const PRELOADED_TICKS = [];
+
+const buildPreloaded = () => {
+  const out = {};
+  const stamp = { done: true, by: "preload", at: new Date("2026-08-10T00:00:00").toISOString() };
+  PRELOADED_TICKS.forEach(id => { out[id] = stamp; });
+  return out;
+};
+
+// ============ HELPERS ============
+const allTasksFlat = () => {
+  const out = [];
+  DAYS.forEach(d => {
+    PERSONS.forEach(p => {
+      (d.tasks[p.key] || []).forEach(t => out.push({ ...t, day: d.day, person: p.key }));
+    });
+  });
+  return out;
+};
+
+const criticalsDoneThrough = (targetDay, completed) => {
+  const all = allTasksFlat();
+  const criticalsBefore = all.filter(t => t.day <= targetDay && t.critical);
+  const done = criticalsBefore.filter(t => completed[t.id]?.done);
+  return {
+    total: criticalsBefore.length,
+    done: done.length,
+    remaining: criticalsBefore.length - done.length,
+    complete: done.length === criticalsBefore.length,
+  };
+};
+
+// ============ LOCAL CACHE (survives wifi drops / reloads) ============
+// This is a real deployed website, not a Claude artifact, so localStorage is safe to use here.
+const LOCAL_CACHE_PREFIX = "kemp-inspection-cache-";
+
+const readLocalCache = (blobId) => {
+  if (!blobId) return null;
+  try {
+    const raw = window.localStorage.getItem(LOCAL_CACHE_PREFIX + blobId);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const writeLocalCache = (blobId, data) => {
+  if (!blobId) return;
+  try {
+    window.localStorage.setItem(LOCAL_CACHE_PREFIX + blobId, JSON.stringify({ ...data, cachedAt: new Date().toISOString() }));
+  } catch {
+    // Storage full or unavailable — fail silently, sync will retry over network
+  }
+};
+
+// Flaky wifi can leave a request hanging for a long time rather than failing cleanly.
+// This wraps fetch with a hard timeout so the app gives up and falls back to cached
+// data quickly instead of showing "syncing…" indefinitely.
+const FETCH_TIMEOUT_MS = 8000;
+const fetchWithTimeout = (url, options = {}) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+};
+
+// ============ MAIN APP ============
+function App() {
+  const initialBlobId = (() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(BLOB_ID_PARAM) || "";
+    } catch { return ""; }
+  })();
+
+  // On first render, try to warm-start from local cache so a reload during a wifi
+  // outage shows the last known state instead of a blank/zeroed list.
+  const cachedOnLoad = readLocalCache(initialBlobId);
+
+  const [completed, setCompleted] = useState(cachedOnLoad?.completed || {});
+  const [activeDay, setActiveDay] = useState(cachedOnLoad?.activeDay || 1);
+  const [catchUpMode, setCatchUpMode] = useState(cachedOnLoad?.catchUpMode || false);
+  const [activePerson, setActivePerson] = useState(null);
+  const [activeView, setActiveView] = useState("today");
+  const [expandedDays, setExpandedDays] = useState({});
+  const [syncStatus, setSyncStatus] = useState("idle");
+  const [lastSync, setLastSync] = useState(null);
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [blobId, setBlobId] = useState(initialBlobId);
+  const [showBlobSetup, setShowBlobSetup] = useState(!initialBlobId);
+  const [blobError, setBlobError] = useState("");
+  const [showDayPicker, setShowDayPicker] = useState(false);
+  const [usingCachedData, setUsingCachedData] = useState(!!cachedOnLoad);
+  // CRITICAL SAFETY GUARD: we must never PUT to the server until we have
+  // successfully READ from it at least once. Otherwise a tap made while the
+  // initial load is still pending (or has failed due to bad wifi) would send an
+  // almost-empty object and destroy everyone else's progress.
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
+  const pendingWriteRef = useRef(null);
+  const lastSavedRef = useRef("");
+  const writeQueueRef = useRef(null);
+  const saveSharedRef = useRef(null);
+
+  const today = new Date();
+  const daysToInspection = Math.max(0, Math.ceil((INSPECTION_DATE - today) / (1000 * 60 * 60 * 24)));
+
+  const activeDayRef = useRef(activeDay);
+  const catchUpModeRef = useRef(catchUpMode);
+  const completedRef = useRef(completed);
+  useEffect(() => { activeDayRef.current = activeDay; }, [activeDay]);
+  useEffect(() => { catchUpModeRef.current = catchUpMode; }, [catchUpMode]);
+  useEffect(() => { completedRef.current = completed; }, [completed]);
+
+  const blobUrl = blobId ? `${JSONBLOB_API}/${blobId}` : null;
+
+  const createBlob = useCallback(async () => {
+    try {
+      setSyncStatus("syncing");
+      setBlobError("");
+      const initialState = { completed: buildPreloaded(), activeDay: 1, catchUpMode: false, createdAt: new Date().toISOString() };
+      const res = await fetchWithTimeout(JSONBLOB_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify(initialState),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const location = res.headers.get("Location") || res.headers.get("location");
+      let newId = "";
+      if (location) {
+        const parts = location.split("/");
+        newId = parts[parts.length - 1];
+      }
+      if (!newId) {
+        const data = await res.json().catch(() => null);
+        if (data && data.id) newId = data.id;
+      }
+      if (!newId) throw new Error("Could not determine new blob ID");
+      setBlobId(newId);
+      setCompleted(buildPreloaded());
+      // We just created this blob, so we definitively know its contents — writes are safe.
+      hasLoadedOnceRef.current = true;
+      setHasLoadedOnce(true);
+      setShowBlobSetup(false);
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set(BLOB_ID_PARAM, newId);
+        window.history.replaceState({}, "", url.toString());
+      } catch {}
+      setSyncStatus("idle");
+      setLastSync(new Date());
+    } catch (e) {
+      setBlobError("Couldn't create shared list. Check your internet and try again.");
+      setSyncStatus("error");
+    }
+  }, []);
+
+  const loadShared = useCallback(async () => {
+    if (!blobUrl) return;
+    if (writeQueueRef.current) return;
+    try {
+      setSyncStatus("syncing");
+      const res = await fetchWithTimeout(blobUrl, {
+        method: "GET",
+        headers: { "Accept": "application/json" },
+      });
+      if (!res.ok) {
+        if (res.status === 404) {
+          setBlobError("This shared list no longer exists.");
+          setSyncStatus("error");
+          return;
+        }
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      const incomingCompleted = data.completed || {};
+      const incomingDay = typeof data.activeDay === "number" ? data.activeDay : 1;
+      const incomingCatchUp = !!data.catchUpMode;
+
+      const localCompleted = completedRef.current;
+      const merged = { ...incomingCompleted };
+      Object.keys(localCompleted).forEach(id => {
+        const local = localCompleted[id];
+        const remote = incomingCompleted[id];
+        if (!remote) {
+          merged[id] = local;
+        } else if (local.at && remote.at && new Date(local.at) > new Date(remote.at)) {
+          merged[id] = local;
+        } else {
+          merged[id] = remote;
+        }
+      });
+
+      const mergedDiffersFromIncoming = JSON.stringify(merged) !== JSON.stringify(incomingCompleted);
+      const snapshot = JSON.stringify({ c: merged, d: incomingDay, m: incomingCatchUp });
+      if (snapshot !== lastSavedRef.current) {
+        setCompleted(merged);
+        setActiveDay(incomingDay);
+        setCatchUpMode(incomingCatchUp);
+        lastSavedRef.current = snapshot;
+        if (mergedDiffersFromIncoming && saveSharedRef.current) {
+          saveSharedRef.current(merged, incomingDay, incomingCatchUp);
+        }
+      }
+      // Successful sync — cache this confirmed state and clear the "showing cached data" flag
+      writeLocalCache(blobId, { completed: merged, activeDay: incomingDay, catchUpMode: incomingCatchUp });
+      setUsingCachedData(false);
+      // We now know what the server holds, so writes are safe from here on.
+      if (!hasLoadedOnceRef.current) {
+        hasLoadedOnceRef.current = true;
+        setHasLoadedOnce(true);
+        // If the user tapped while we were still loading, that change was held
+        // back. Merge it onto the freshly-loaded server state and send it now.
+        if (pendingWriteRef.current) {
+          const held = pendingWriteRef.current;
+          pendingWriteRef.current = null;
+          const reconciled = { ...merged };
+          Object.keys(held.completed).forEach(id => {
+            const heldEntry = held.completed[id];
+            const serverEntry = merged[id];
+            if (!serverEntry) {
+              reconciled[id] = heldEntry;
+            } else if (heldEntry.at && serverEntry.at && new Date(heldEntry.at) > new Date(serverEntry.at)) {
+              reconciled[id] = heldEntry;
+            }
+          });
+          setCompleted(reconciled);
+          if (saveSharedRef.current) {
+            saveSharedRef.current(reconciled, held.activeDay, held.catchUpMode);
+          }
+        }
+      }
+      setSyncStatus("idle");
+      setLastSync(new Date());
+      setBlobError("");
+    } catch (e) {
+      setSyncStatus("offline");
+    }
+  }, [blobUrl, blobId]);
+
+  const saveShared = useCallback((nextCompleted, nextActiveDay, nextCatchUp) => {
+    if (!blobUrl) return;
+    // Cache immediately on every local change, regardless of network — this is what
+    // protects against the "wiped to 0" problem when wifi drops right after a tick.
+    writeLocalCache(blobId, { completed: nextCompleted, activeDay: nextActiveDay, catchUpMode: nextCatchUp });
+
+    // SAFETY: never write to the shared server until we have confirmed what it
+    // already contains. Hold the change locally and flush it once the first
+    // successful load completes.
+    if (!hasLoadedOnceRef.current) {
+      pendingWriteRef.current = { completed: nextCompleted, activeDay: nextActiveDay, catchUpMode: nextCatchUp };
+      return;
+    }
+
+    if (writeQueueRef.current) clearTimeout(writeQueueRef.current);
+    const payload = {
+      completed: nextCompleted,
+      activeDay: nextActiveDay,
+      catchUpMode: nextCatchUp,
+      updatedAt: new Date().toISOString(),
+    };
+    lastSavedRef.current = JSON.stringify({ c: nextCompleted, d: nextActiveDay, m: nextCatchUp });
+    writeQueueRef.current = setTimeout(async () => {
+      try {
+        setSyncStatus("syncing");
+        const res = await fetchWithTimeout(blobUrl, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setSyncStatus("idle");
+        setLastSync(new Date());
+      } catch (e) {
+        setSyncStatus("offline");
+      } finally {
+        writeQueueRef.current = null;
+      }
+    }, 400);
+  }, [blobUrl, blobId]);
+
+  useEffect(() => { saveSharedRef.current = saveShared; }, [saveShared]);
+
+  useEffect(() => {
+    if (!blobUrl) return;
+    loadShared();
+    const interval = setInterval(loadShared, POLL_MS);
+    return () => clearInterval(interval);
+  }, [loadShared, blobUrl]);
+
+  const toggle = useCallback((taskId, person) => {
+    setCompleted(prev => {
+      const wasDone = prev[taskId]?.done;
+      const stamp = { done: !wasDone, by: person || "anyone", at: new Date().toISOString() };
+      const next = { ...prev, [taskId]: stamp };
+      saveShared(next, activeDayRef.current, catchUpModeRef.current);
+      return next;
+    });
+  }, [saveShared]);
+
+  const changeDay = useCallback((newDay) => {
+    setActiveDay(newDay);
+    setShowDayPicker(false);
+    saveShared(completedRef.current, newDay, catchUpModeRef.current);
+  }, [saveShared]);
+
+  const toggleCatchUp = useCallback(() => {
+    setCatchUpMode(prev => {
+      const next = !prev;
+      saveShared(completedRef.current, activeDayRef.current, next);
+      return next;
+    });
+  }, [saveShared]);
+
+  const advanceDay = useCallback(() => {
+    setActiveDay(prev => {
+      const newDay = Math.min(prev + 1, DAYS.length);
+      setCatchUpMode(false);
+      saveShared(completedRef.current, newDay, false);
+      return newDay;
+    });
+  }, [saveShared]);
+
+  const stats = useMemo(() => {
+    const all = allTasksFlat();
+    const total = all.length;
+    const done = all.filter(t => completed[t.id]?.done).length;
+    const critical = all.filter(t => t.critical);
+    const criticalDone = critical.filter(t => completed[t.id]?.done).length;
+    const byPerson = {};
+    PERSONS.forEach(p => {
+      const tasks = all.filter(t => t.person === p.key);
+      byPerson[p.key] = { total: tasks.length, done: tasks.filter(t => completed[t.id]?.done).length };
+    });
+    const byDay = {};
+    DAYS.forEach(d => {
+      const tasks = all.filter(t => t.day === d.day);
+      byDay[d.day] = {
+        total: tasks.length,
+        done: tasks.filter(t => completed[t.id]?.done).length,
+        critical: tasks.filter(t => t.critical).length,
+        criticalDone: tasks.filter(t => t.critical && completed[t.id]?.done).length,
+      };
+    });
+    return { total, done, criticalTotal: critical.length, criticalDone, byPerson, byDay };
+  }, [completed]);
+
+  const advanceCheck = useMemo(() => criticalsDoneThrough(activeDay, completed), [activeDay, completed]);
+  const canAdvance = advanceCheck.complete && activeDay < DAYS.length;
+
+  const visibleDays = useMemo(() => {
+    if (activeView === "today") {
+      if (catchUpMode) {
+        const merged = {
+          day: activeDay, label: "Catch-up", subtitle: `Unfinished from Day 1–${activeDay}`,
+          tasks: Object.fromEntries(PERSONS.map(p => [p.key, []])),
+        };
+        DAYS.filter(d => d.day <= activeDay).forEach(d => {
+          PERSONS.forEach(p => {
+            (d.tasks[p.key] || []).forEach(t => {
+              if (!completed[t.id]?.done) merged.tasks[p.key].push({ ...t, _fromDay: d.day });
+            });
+          });
+        });
+        PERSONS.forEach(p => {
+          merged.tasks[p.key].sort((a, b) => {
+            if (a.critical !== b.critical) return a.critical ? -1 : 1;
+            return a._fromDay - b._fromDay;
+          });
+        });
+        return [merged];
+      }
+      return DAYS.filter(d => d.day === activeDay);
+    }
+    if (activeView === "critical") {
+      return DAYS.map(d => {
+        const filteredTasks = {};
+        Object.keys(d.tasks).forEach(p => {
+          const filtered = d.tasks[p].filter(t => t.critical && !completed[t.id]?.done);
+          if (filtered.length) filteredTasks[p] = filtered;
+        });
+        return Object.keys(filteredTasks).length ? { ...d, tasks: filteredTasks } : null;
+      }).filter(Boolean);
+    }
+    if (activeView === "smell") {
+      return DAYS.map(d => {
+        const filteredTasks = {};
+        Object.keys(d.tasks).forEach(p => {
+          const filtered = d.tasks[p].filter(t => t.cat === "smell");
+          if (filtered.length) filteredTasks[p] = filtered;
+        });
+        return Object.keys(filteredTasks).length ? { ...d, tasks: filteredTasks } : null;
+      }).filter(Boolean);
+    }
+    return DAYS;
+  }, [activeView, activeDay, catchUpMode, completed]);
+
+  const filterByPerson = (tasks) => {
+    if (!activePerson) return tasks;
+    return { [activePerson]: tasks[activePerson] || [] };
+  };
+
+  if (showBlobSetup) {
+    return <BlobSetupScreen
+      onCreate={createBlob}
+      onJoin={(id) => {
+        setBlobId(id.trim());
+        setShowBlobSetup(false);
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set(BLOB_ID_PARAM, id.trim());
+          window.history.replaceState({}, "", url.toString());
+        } catch {}
+      }}
+      error={blobError}
+      syncing={syncStatus === "syncing"}
+    />;
+  }
+
+  if (showWelcome && !activePerson) {
+    return <WelcomeScreen
+      onSelect={(p) => { setActivePerson(p); setShowWelcome(false); }}
+      stats={stats}
+      daysToInspection={daysToInspection}
+      blobId={blobId}
+      onResetBlob={() => { setShowBlobSetup(true); setBlobId(""); setCompleted({}); }}
+    />;
+  }
+
+  const activeDayObj = DAYS.find(d => d.day === activeDay);
+
+  return (
+    <div className="min-h-screen w-full" style={{
+      background: "radial-gradient(ellipse at top, #1a0b2e 0%, #0a0612 50%, #000 100%)",
+      fontFamily: "'Instrument Sans', -apple-system, sans-serif",
+      color: "#f5f5f7",
+    }}>
+      <header className="sticky top-0 z-30 backdrop-blur-xl" style={{
+        background: "rgba(10, 6, 18, 0.92)",
+        borderBottom: "1px solid rgba(255,255,255,0.08)",
+      }}>
+        <div className="px-4 pt-3 pb-2">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.2em] opacity-50">Inspection Aug 18</div>
+              <div className="text-2xl italic leading-none mt-0.5" style={{ fontFamily: "'Instrument Serif', serif" }}>
+                {daysToInspection === 0
+                  ? <span className="not-italic text-base font-semibold" style={{ color: "#ec4899" }}>Inspection today</span>
+                  : <>{daysToInspection} <span className="not-italic text-sm opacity-70">{daysToInspection === 1 ? "day" : "days"} left</span></>
+                }
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <SyncIndicator status={syncStatus} lastSync={lastSync} />
+              <button
+                onClick={() => setShowWelcome(true)}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold"
+                style={{
+                  background: PERSONS.find(p => p.key === activePerson)?.color,
+                  color: "#000",
+                }}
+              >
+                {PERSONS.find(p => p.key === activePerson)?.initial}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 mb-2.5">
+            <button
+              onClick={() => setShowDayPicker(true)}
+              className="flex-1 flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all active:scale-[0.98]"
+              style={{
+                background: catchUpMode ? "rgba(251,191,36,0.12)" : "rgba(255,255,255,0.06)",
+                border: `1px solid ${catchUpMode ? "rgba(251,191,36,0.3)" : "rgba(255,255,255,0.08)"}`,
+              }}
+            >
+              <div>
+                <div className="text-[9px] uppercase tracking-[0.15em] opacity-50 leading-none mb-0.5">
+                  {catchUpMode ? "Catch-up mode" : "Currently on"}
+                </div>
+                <div className="text-sm font-semibold leading-tight">
+                  Day {activeDay} · {activeDayObj?.label}
+                </div>
+              </div>
+              <ChevronDown size={14} opacity={0.4} />
+            </button>
+            <button
+              onClick={toggleCatchUp}
+              className="px-3 py-2 rounded-xl text-[10px] font-semibold uppercase tracking-wider transition-all active:scale-95"
+              style={{
+                background: catchUpMode ? "#fbbf24" : "rgba(255,255,255,0.06)",
+                color: catchUpMode ? "#000" : "rgba(255,255,255,0.7)",
+                border: `1px solid ${catchUpMode ? "#fbbf24" : "rgba(255,255,255,0.08)"}`,
+              }}
+            >
+              {catchUpMode ? "Exit" : "Catch-up"}
+            </button>
+          </div>
+
+          {!catchUpMode && activeDay < DAYS.length && (
+            <button
+              onClick={canAdvance ? advanceDay : undefined}
+              disabled={!canAdvance}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all active:scale-[0.98] mb-2.5"
+              style={{
+                background: canAdvance ? "linear-gradient(90deg, #10b981, #34d399)" : "rgba(255,255,255,0.03)",
+                color: canAdvance ? "#000" : "rgba(255,255,255,0.5)",
+                border: `1px solid ${canAdvance ? "transparent" : "rgba(255,255,255,0.06)"}`,
+                opacity: canAdvance ? 1 : 0.7,
+              }}
+            >
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.15em] font-semibold leading-none mb-0.5">
+                  {canAdvance ? "Ready to advance" : "Cannot advance yet"}
+                </div>
+                <div className="text-[12px] font-medium leading-tight">
+                  {canAdvance
+                    ? `Tap to move to Day ${activeDay + 1}`
+                    : `${advanceCheck.remaining} critical task${advanceCheck.remaining === 1 ? "" : "s"} blocking · Days 1–${activeDay}`}
+                </div>
+              </div>
+              {canAdvance && <ArrowRight size={16} />}
+            </button>
+          )}
+
+          <div className="flex items-center gap-2 mb-2.5">
+            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+              <div
+                className="h-full transition-all duration-500"
+                style={{
+                  width: `${(stats.done / stats.total) * 100}%`,
+                  background: "linear-gradient(90deg, #ec4899, #a855f7, #3b82f6)",
+                }}
+              />
+            </div>
+            <div className="text-[11px] opacity-70 tabular-nums">{stats.done}/{stats.total}</div>
+          </div>
+
+          {stats.criticalDone < stats.criticalTotal && (
+            <div className="flex items-center gap-2 text-[11px] mb-2.5">
+              <AlertCircle size={12} style={{ color: "#fbbf24" }} />
+              <span className="opacity-80">
+                <span style={{ color: "#fbbf24", fontWeight: 600 }}>{stats.criticalTotal - stats.criticalDone}</span> critical items remaining
+              </span>
+            </div>
+          )}
+
+          <div className="flex gap-1.5 -mx-1 px-1 overflow-x-auto scrollbar-none">
+            {[
+              { key: "today", label: catchUpMode ? "Catch-up" : `Day ${activeDay}` },
+              { key: "critical", label: "Critical only" },
+              { key: "smell", label: "Smell control" },
+              { key: "all", label: "All days" },
+            ].map(v => (
+              <button
+                key={v.key}
+                onClick={() => setActiveView(v.key)}
+                className="px-3 py-1.5 rounded-full text-[11px] font-medium whitespace-nowrap transition-all"
+                style={{
+                  background: activeView === v.key ? "#fff" : "rgba(255,255,255,0.06)",
+                  color: activeView === v.key ? "#000" : "rgba(255,255,255,0.7)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="pb-3 flex gap-1.5 overflow-x-auto scrollbar-none px-4">
+          <button
+            onClick={() => setActivePerson(null)}
+            className="flex-shrink-0 py-2 px-3 rounded-lg text-[11px] font-medium transition-all min-w-[60px]"
+            style={{
+              background: !activePerson ? "rgba(255,255,255,0.12)" : "transparent",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: !activePerson ? "#fff" : "rgba(255,255,255,0.5)",
+            }}
+          >
+            All
+          </button>
+          {PERSONS.map(p => {
+            const ps = stats.byPerson[p.key];
+            const pct = ps.total ? Math.round((ps.done / ps.total) * 100) : 0;
+            return (
+              <button
+                key={p.key}
+                onClick={() => setActivePerson(p.key)}
+                className="flex-shrink-0 py-2 px-3 rounded-lg text-[11px] font-medium transition-all relative overflow-hidden min-w-[60px]"
+                style={{
+                  background: activePerson === p.key ? p.color : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${activePerson === p.key ? p.color : "rgba(255,255,255,0.08)"}`,
+                  color: activePerson === p.key ? "#000" : "rgba(255,255,255,0.7)",
+                }}
+              >
+                <div>{p.label}</div>
+                <div className="text-[9px] opacity-70 mt-0.5 tabular-nums">{pct}%</div>
+              </button>
+            );
+          })}
+        </div>
+      </header>
+
+      {showDayPicker && (
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center"
+          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)" }}
+          onClick={() => setShowDayPicker(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-3xl p-5 pb-8"
+            style={{
+              background: "linear-gradient(180deg, #1a0b2e, #0a0612)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderBottom: "none",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-1 rounded-full mx-auto mb-5" style={{ background: "rgba(255,255,255,0.2)" }} />
+            <div className="text-[10px] uppercase tracking-[0.2em] opacity-50 mb-1">Choose active day</div>
+            <div className="text-2xl italic mb-1" style={{ fontFamily: "'Instrument Serif', serif" }}>
+              What day are we on?
+            </div>
+            <div className="text-[11px] opacity-60 leading-relaxed mb-4">
+              Tap any day to switch. Everyone's phone will follow.
+            </div>
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {DAYS.map(d => {
+                const ds = stats.byDay[d.day];
+                const pct = ds.total ? Math.round((ds.done / ds.total) * 100) : 0;
+                const isActive = d.day === activeDay;
+                return (
+                  <button
+                    key={d.day}
+                    onClick={() => changeDay(d.day)}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all active:scale-[0.98]"
+                    style={{
+                      background: isActive ? "rgba(236,72,153,0.15)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${isActive ? "#ec4899" : "rgba(255,255,255,0.06)"}`,
+                    }}
+                  >
+                    <div
+                      style={{ fontFamily: "'Instrument Serif', serif" }}
+                      className="text-3xl italic leading-none w-9 text-center"
+                    >
+                      {d.day}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold">{d.label}</div>
+                      <div className="text-[11px] opacity-60">{d.subtitle}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[11px] opacity-80 tabular-nums">{pct}%</div>
+                      <div className="text-[10px]" style={{ color: ds.criticalDone === ds.critical ? "#10b981" : "#fbbf24" }}>
+                        {ds.criticalDone}/{ds.critical} crit
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => setShowDayPicker(false)}
+              className="w-full mt-4 py-3 rounded-xl text-sm font-semibold"
+              style={{ background: "rgba(255,255,255,0.06)", color: "#fff", border: "1px solid rgba(255,255,255,0.08)" }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main className="px-4 pb-32 pt-4">
+        {(!hasLoadedOnce || usingCachedData || syncStatus === "offline") && (
+          <div className="mb-5 p-4 rounded-2xl" style={{
+            background: !hasLoadedOnce
+              ? "linear-gradient(135deg, rgba(168,85,247,0.12), rgba(59,130,246,0.08))"
+              : "linear-gradient(135deg, rgba(239,68,68,0.12), rgba(251,191,36,0.08))",
+            border: `1px solid ${!hasLoadedOnce ? "rgba(168,85,247,0.3)" : "rgba(239,68,68,0.3)"}`,
+          }}>
+            <div className="flex items-center gap-2 mb-1">
+              {!hasLoadedOnce
+                ? <RefreshCw size={12} className="animate-spin" style={{ color: "#c4b5fd" }} />
+                : <WifiOff size={12} style={{ color: "#f87171" }} />}
+              <div className="text-[10px] uppercase tracking-[0.2em] font-semibold" style={{ color: !hasLoadedOnce ? "#c4b5fd" : "#f87171" }}>
+                {!hasLoadedOnce ? "Loading everyone's progress" : syncStatus === "offline" ? "No connection" : "Showing saved copy"}
+              </div>
+            </div>
+            <div className="text-[12px] opacity-80 leading-relaxed">
+              {!hasLoadedOnce
+                ? "Fetching the shared list. You can tick things now — they'll be saved and merged in as soon as this finishes. Nothing will be overwritten."
+                : syncStatus === "offline"
+                  ? "Can't reach the server right now. Your taps are being saved on this phone and will sync once wifi is back — nothing is lost."
+                  : "Reconnecting to get the latest from everyone. What you see is this phone's last saved copy."}
+            </div>
+          </div>
+        )}
+
+        {catchUpMode && activeView === "today" && (
+          <div className="mb-5 p-4 rounded-2xl" style={{
+            background: "linear-gradient(135deg, rgba(251,191,36,0.15), rgba(168,85,247,0.08))",
+            border: "1px solid rgba(251,191,36,0.3)",
+          }}>
+            <div className="flex items-center gap-2 mb-1">
+              <Pause size={12} style={{ color: "#fbbf24" }} />
+              <div className="text-[10px] uppercase tracking-[0.2em] font-semibold" style={{ color: "#fbbf24" }}>Catch-up mode</div>
+            </div>
+            <div className="text-xl italic mb-1" style={{ fontFamily: "'Instrument Serif', serif" }}>Finishing what's behind</div>
+            <div className="text-[12px] opacity-80 leading-relaxed">
+              Showing all unfinished tasks from Day 1 through Day {activeDay}, critical first.
+            </div>
+          </div>
+        )}
+
+        {visibleDays.length === 0 && (
+          <div className="text-center py-20">
+            <div className="text-3xl italic mb-2" style={{ fontFamily: "'Instrument Serif', serif" }}>All clear.</div>
+            <div className="text-sm opacity-60">No tasks match this view.</div>
+          </div>
+        )}
+
+        {visibleDays.map(d => {
+          const dayStats = catchUpMode ? null : stats.byDay[d.day];
+          const isPast = d.day < activeDay;
+          const isToday = d.day === activeDay;
+          const expanded = activeView !== "today" ? (expandedDays[d.day] ?? isToday) : true;
+
+          return (
+            <section key={d.day + (catchUpMode ? "-catchup" : "")} className="mb-5">
+              {!catchUpMode && (
+                <button
+                  onClick={() => activeView !== "today" && setExpandedDays(prev => ({ ...prev, [d.day]: !expanded }))}
+                  className="w-full text-left mb-3"
+                  disabled={activeView === "today"}
+                >
+                  <div className="flex items-end justify-between">
+                    <div className="flex items-baseline gap-3">
+                      <div className="text-5xl italic leading-none" style={{
+                        fontFamily: "'Instrument Serif', serif",
+                        color: isToday ? "#ec4899" : isPast ? "rgba(255,255,255,0.25)" : "#fff",
+                      }}>
+                        {d.day}
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.2em] opacity-50">Day {d.day}</div>
+                        <div className="text-base font-semibold leading-tight">{d.label}</div>
+                        <div className="text-[11px] opacity-50">{d.subtitle}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {dayStats && (
+                        <div className="text-right">
+                          <div className="text-xs tabular-nums opacity-80">{dayStats.done}/{dayStats.total}</div>
+                          {dayStats.critical > 0 && (
+                            <div className="text-[10px] tabular-nums" style={{ color: dayStats.criticalDone === dayStats.critical ? "#10b981" : "#fbbf24" }}>
+                              {dayStats.criticalDone}/{dayStats.critical} critical
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {activeView !== "today" && (expanded ? <ChevronUp size={16} opacity={0.4} /> : <ChevronDown size={16} opacity={0.4} />)}
+                    </div>
+                  </div>
+                  {dayStats && (
+                    <div className="mt-2 h-0.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                      <div className="h-full transition-all" style={{
+                        width: `${(dayStats.done / dayStats.total) * 100}%`,
+                        background: isPast ? "rgba(255,255,255,0.3)" : "linear-gradient(90deg, #ec4899, #a855f7)",
+                      }} />
+                    </div>
+                  )}
+                </button>
+              )}
+
+              {expanded && (
+                <div className="space-y-4">
+                  {Object.entries(filterByPerson(d.tasks)).map(([personKey, tasks]) => {
+                    if (!tasks || tasks.length === 0) return null;
+                    const person = PERSONS.find(p => p.key === personKey);
+                    if (!person) return null;
+                    return (
+                      <div key={personKey}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold" style={{
+                            background: person.color, color: "#000",
+                          }}>
+                            {person.initial}
+                          </div>
+                          <div className="text-[11px] uppercase tracking-[0.15em] font-semibold opacity-80">{person.label}</div>
+                          <div className="flex-1 h-px" style={{ background: "rgba(255,255,255,0.06)" }} />
+                          <div className="text-[10px] opacity-50 tabular-nums">
+                            {tasks.filter(t => completed[t.id]?.done).length}/{tasks.length}
+                          </div>
+                        </div>
+                        <div className="space-y-1.5">
+                          {tasks.map(task => (
+                            <TaskRow
+                              key={task.id}
+                              task={task}
+                              completed={completed[task.id]}
+                              onToggle={() => toggle(task.id, activePerson)}
+                              accent={person.color}
+                              showFromDay={catchUpMode}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </main>
+
+      <footer className="fixed bottom-0 left-0 right-0 px-4 py-3 backdrop-blur-xl text-center text-[10px] opacity-50" style={{
+        background: "rgba(10, 6, 18, 0.85)",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+      }}>
+        Synced across all phones · Tap your initial to switch person
+      </footer>
+    </div>
+  );
+}
+
+function TaskRow({ task, completed, onToggle, accent, showFromDay }) {
+  const isDone = completed?.done;
+  const CatIcon = CAT_META[task.cat]?.icon || Circle;
+  const checkedBy = completed?.by ? PERSONS.find(p => p.key === completed.by) : null;
+
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all active:scale-[0.98]"
+      style={{
+        background: isDone ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.04)",
+        border: `1px solid ${task.critical && !isDone ? "rgba(251,191,36,0.25)" : "rgba(255,255,255,0.06)"}`,
+      }}
+    >
+      <div className="mt-0.5 w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 transition-all" style={{
+        background: isDone ? accent : "transparent",
+        border: `1.5px solid ${isDone ? accent : "rgba(255,255,255,0.25)"}`,
+      }}>
+        {isDone && <Check size={12} strokeWidth={3} color="#000" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] leading-snug" style={{
+          color: isDone ? "rgba(255,255,255,0.4)" : "#fff",
+          textDecoration: isDone ? "line-through" : "none",
+          textDecorationColor: "rgba(255,255,255,0.3)",
+        }}>
+          {task.text}
+        </div>
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          <div className="flex items-center gap-1 text-[9px] uppercase tracking-wider opacity-50">
+            <CatIcon size={9} />
+            <span>{CAT_META[task.cat]?.label || task.cat}</span>
+          </div>
+          {task.critical && !isDone && (
+            <div className="text-[9px] uppercase tracking-wider font-semibold" style={{ color: "#fbbf24" }}>
+              · Critical
+            </div>
+          )}
+          {showFromDay && task._fromDay && (
+            <div className="text-[9px] uppercase tracking-wider opacity-60">
+              · Day {task._fromDay}
+            </div>
+          )}
+          {checkedBy && isDone && checkedBy.key !== "preload" && (
+            <div className="text-[9px] opacity-50 ml-auto">
+              by {checkedBy.label}
+            </div>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function SyncIndicator({ status, lastSync }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const i = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(i);
+  }, []);
+  const ago = lastSync ? Math.floor((Date.now() - lastSync.getTime()) / 1000) : null;
+  const agoLabel = ago === null ? "—" : ago < 5 ? "just now" : ago < 60 ? `${ago}s` : `${Math.floor(ago/60)}m`;
+  return (
+    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[9px]" style={{
+      background: "rgba(255,255,255,0.04)",
+      border: "1px solid rgba(255,255,255,0.06)",
+    }}>
+      {status === "syncing" ? (
+        <RefreshCw size={9} className="animate-spin" style={{ color: "#a855f7" }} />
+      ) : status === "error" || status === "offline" ? (
+        <WifiOff size={9} style={{ color: "#fbbf24" }} />
+      ) : (
+        <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#10b981" }} />
+      )}
+      <span className="opacity-70 tabular-nums">{agoLabel}</span>
+    </div>
+  );
+}
+
+function WelcomeScreen({ onSelect, stats, daysToInspection, blobId, onResetBlob }) {
+  const [copied, setCopied] = useState(false);
+  const shareLink = useMemo(() => {
+    if (!blobId) return "";
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set(BLOB_ID_PARAM, blobId);
+      return url.toString();
+    } catch { return ""; }
+  }, [blobId]);
+
+  const copyLink = () => {
+    if (!shareLink) return;
+    try {
+      navigator.clipboard.writeText(shareLink);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col" style={{
+      background: "radial-gradient(ellipse at top, #1a0b2e 0%, #0a0612 50%, #000 100%)",
+      fontFamily: "'Instrument Sans', -apple-system, sans-serif",
+      color: "#f5f5f7",
+    }}>
+      <div className="flex-1 flex flex-col justify-center px-6 py-12">
+        <div className="text-[10px] uppercase tracking-[0.3em] opacity-50 mb-3">Aug 18 · 9:00 AM</div>
+        <div className="text-6xl italic leading-[0.95] mb-2" style={{ fontFamily: "'Instrument Serif', serif" }}>
+          The<br/>inspection<br/>plan.
+        </div>
+        <div className="flex items-baseline gap-3 mt-6 mb-12">
+          <div className="text-7xl italic leading-none" style={{
+            fontFamily: "'Instrument Serif', serif",
+            background: "linear-gradient(135deg, #ec4899, #a855f7)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}>
+            {daysToInspection}
+          </div>
+          <div className="text-sm opacity-60">days<br/>to go</div>
+        </div>
+
+        <div className="mb-10">
+          <div className="text-[11px] uppercase tracking-[0.2em] opacity-50 mb-3">Overall progress</div>
+          <div className="flex items-baseline gap-2 mb-3">
+            <div className="text-4xl italic" style={{ fontFamily: "'Instrument Serif', serif" }}>{stats.done}</div>
+            <div className="text-sm opacity-50">of {stats.total} tasks</div>
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+            <div className="h-full transition-all duration-700" style={{
+              width: `${(stats.done / stats.total) * 100}%`,
+              background: "linear-gradient(90deg, #ec4899, #a855f7, #3b82f6)",
+            }} />
+          </div>
+        </div>
+
+        <div className="text-[11px] uppercase tracking-[0.2em] opacity-50 mb-3">I'm checking in as</div>
+        <div className="space-y-2">
+          {PERSONS.map(p => {
+            const ps = stats.byPerson[p.key];
+            const pct = ps.total ? Math.round((ps.done / ps.total) * 100) : 0;
+            return (
+              <button
+                key={p.key}
+                onClick={() => onSelect(p.key)}
+                className="w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all active:scale-[0.98]"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+              >
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold" style={{
+                  background: p.color, color: "#000",
+                }}>
+                  {p.initial}
+                </div>
+                <div className="flex-1">
+                  <div className="text-base font-semibold">{p.label}</div>
+                  <div className="text-[11px] opacity-60">{p.role}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm tabular-nums">{pct}%</div>
+                  <div className="text-[10px] opacity-50 tabular-nums">{ps.done}/{ps.total}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {blobId && (
+          <div className="mt-8 p-4 rounded-2xl" style={{
+            background: "rgba(168,85,247,0.08)",
+            border: "1px solid rgba(168,85,247,0.2)",
+          }}>
+            <div className="flex items-center gap-2 mb-2">
+              <Wifi size={12} style={{ color: "#a855f7" }} />
+              <div className="text-[10px] uppercase tracking-[0.15em] font-semibold" style={{ color: "#a855f7" }}>Shared list — no login needed</div>
+            </div>
+            <div className="text-[12px] opacity-80 leading-relaxed mb-3">
+              Send this link to anyone helping. They open it on any browser — no accounts.
+            </div>
+            <div className="flex gap-2 items-center mb-2">
+              <div className="flex-1 px-3 py-2 rounded-lg text-[10px] font-mono truncate" style={{
+                background: "rgba(0,0,0,0.3)",
+                border: "1px solid rgba(255,255,255,0.06)",
+              }}>
+                {shareLink || `Code: ${blobId}`}
+              </div>
+              <button
+                onClick={copyLink}
+                className="px-3 py-2 rounded-lg text-[11px] font-semibold transition-all active:scale-95"
+                style={{
+                  background: copied ? "#10b981" : "#a855f7",
+                  color: copied ? "#000" : "#fff",
+                }}
+              >
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <div className="text-[10px] opacity-50 leading-relaxed">
+              Code: <span className="font-mono">{blobId}</span> · Anyone with this can edit.
+            </div>
+            <button onClick={onResetBlob} className="mt-3 text-[10px] underline opacity-50">
+              Start a new shared list
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function BlobSetupScreen({ onCreate, onJoin, error, syncing }) {
+  const [joinCode, setJoinCode] = useState("");
+  const [mode, setMode] = useState("choose");
+
+  return (
+    <div className="min-h-screen flex flex-col" style={{
+      background: "radial-gradient(ellipse at top, #1a0b2e 0%, #0a0612 50%, #000 100%)",
+      fontFamily: "'Instrument Sans', -apple-system, sans-serif",
+      color: "#f5f5f7",
+    }}>
+      <div className="flex-1 flex flex-col justify-center px-6 py-12 max-w-md mx-auto w-full">
+        <div className="text-[10px] uppercase tracking-[0.3em] opacity-50 mb-3">Step 1 of 2</div>
+        <div className="text-5xl italic leading-[0.95] mb-3" style={{ fontFamily: "'Instrument Serif', serif" }}>
+          Set up your<br/>shared list.
+        </div>
+        <div className="text-sm opacity-70 mb-10 leading-relaxed">
+          Tasks sync between everyone helping. No accounts, no signup.
+        </div>
+
+        {mode === "choose" && (
+          <div className="space-y-3">
+            <button
+              onClick={onCreate}
+              disabled={syncing}
+              className="w-full p-5 rounded-2xl text-left transition-all active:scale-[0.98] disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg, #ec4899, #a855f7)", color: "#fff" }}
+            >
+              <div className="text-[10px] uppercase tracking-[0.2em] opacity-90 mb-1">First person</div>
+              <div className="text-lg font-semibold mb-1">Start a new shared list</div>
+              <div className="text-[11px] opacity-80">{syncing ? "Creating…" : "Get a link to send to everyone else"}</div>
+            </button>
+            <button
+              onClick={() => setMode("join")}
+              className="w-full p-5 rounded-2xl text-left transition-all active:scale-[0.98]"
+              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+            >
+              <div className="text-[10px] uppercase tracking-[0.2em] opacity-60 mb-1">Joining someone</div>
+              <div className="text-lg font-semibold mb-1">I have a code or link</div>
+              <div className="text-[11px] opacity-60">Enter the code to join an existing list</div>
+            </button>
+          </div>
+        )}
+
+        {mode === "join" && (
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.15em] opacity-60 mb-2">Paste link or code</div>
+            <input
+              type="text"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value)}
+              placeholder="e.g. abc123def456"
+              className="w-full px-4 py-3 rounded-xl text-sm font-mono mb-4"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", outline: "none" }}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMode("choose")}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", color: "#fff" }}
+              >
+                Back
+              </button>
+              <button
+                onClick={() => {
+                  let id = joinCode.trim();
+                  if (id.includes("?")) {
+                    try {
+                      const u = new URL(id);
+                      const param = u.searchParams.get(BLOB_ID_PARAM);
+                      if (param) id = param;
+                    } catch {}
+                  }
+                  if (id) onJoin(id);
+                }}
+                disabled={!joinCode.trim()}
+                className="flex-[2] py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg, #ec4899, #a855f7)", color: "#fff" }}
+              >
+                Join shared list
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-6 p-3 rounded-xl text-[12px]" style={{
+            background: "rgba(239,68,68,0.1)",
+            border: "1px solid rgba(239,68,68,0.3)",
+            color: "#fca5a5",
+          }}>
+            {error}
+          </div>
+        )}
+
+        <div className="mt-10 text-[10px] opacity-40 leading-relaxed">
+          Data is stored on jsonblob.com — a free public service. The code acts like a password.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
