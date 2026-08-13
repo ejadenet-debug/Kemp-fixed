@@ -70,7 +70,9 @@
 </script>
 
 <script>
+window.__startApp = function(){
 "use strict";
+try {
 var __rest = (this && this.__rest) || function (s, e) {
     var t = {};
     for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
@@ -115,7 +117,7 @@ const Car = mk(["M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 1
 // ============ CONFIG ============
 const INSPECTION_DATE = new Date("2026-08-18T09:00:00");
 const POLL_MS = 6000;
-const JSONBLOB_API = "https://jsonblob.com/api/jsonBlob";
+const SYNC_API = "https://ivhwgtjtjofdviqwleqp.supabase.co/functions/v1/checklist";
 const BLOB_ID_PARAM = "blob";
 // ============ DATA ============
 const PERSONS = [
@@ -549,6 +551,13 @@ const fetchWithTimeout = (url, options = {}) => {
     const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     return fetch(url, Object.assign(Object.assign({}, options), { signal: controller.signal })).finally(() => clearTimeout(timeoutId));
 };
+const normalizeCustomTasks = (items, fallbackAt) => {
+    const fallback = fallbackAt || "1970-01-01T00:00:00.000Z";
+    return (Array.isArray(items) ? items : []).filter(t => t && t.id).map(t => Object.assign({}, t, {
+        deleted: !!t.deleted,
+        updatedAt: t.updatedAt || t.createdAt || fallback,
+    }));
+};
 // ============ MAIN APP ============
 function App() {
     var _a, _b;
@@ -577,7 +586,7 @@ function App() {
     const [showBlobSetup, setShowBlobSetup] = useState(!initialBlobId);
     const [blobError, setBlobError] = useState("");
     const [showDayPicker, setShowDayPicker] = useState(false);
-    const [customTasks, setCustomTasks] = useState((cachedOnLoad === null || cachedOnLoad === void 0 ? void 0 : cachedOnLoad.customTasks) || []);
+    const [customTasks, setCustomTasks] = useState(normalizeCustomTasks((cachedOnLoad === null || cachedOnLoad === void 0 ? void 0 : cachedOnLoad.customTasks) || [], (cachedOnLoad === null || cachedOnLoad === void 0 ? void 0 : cachedOnLoad.cachedAt)));
     const [showAddTask, setShowAddTask] = useState(false);
     const [newTaskText, setNewTaskText] = useState("");
     const [newTaskPerson, setNewTaskPerson] = useState("shared");
@@ -591,60 +600,68 @@ function App() {
     const [backupCopied, setBackupCopied] = useState(false);
     const [showRestore, setShowRestore] = useState(false);
     const [restoreText, setRestoreText] = useState("");
-    // CRITICAL SAFETY GUARD: we must never PUT to the server until we have
-    // successfully READ from it at least once. Otherwise a tap made while the
-    // initial load is still pending (or has failed due to bad wifi) would send an
-    // almost-empty object and destroy everyone else's progress.
+    // STARTUP SAFETY GUARD: hold writes until the first successful read so this
+    // phone can merge its cached/offline changes with the shared state first.
     const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
     const hasLoadedOnceRef = useRef(false);
     const pendingWriteRef = useRef(null);
     const lastSavedRef = useRef("");
     const writeQueueRef = useRef(null);
+    const writeGenerationRef = useRef(0);
     const saveSharedRef = useRef(null);
     // Timestamp of the last day/catch-up change made on THIS device, so we can
     // tell whether an incoming change from another phone is newer than ours.
-    const settingsStampRef = useRef("");
+    const settingsStampRef = useRef((cachedOnLoad === null || cachedOnLoad === void 0 ? void 0 : cachedOnLoad.settingsAt) || "");
+    const settingsValueRef = useRef({ activeDay, catchUpMode });
     const today = new Date();
     const daysToInspection = Math.max(0, Math.ceil((INSPECTION_DATE.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
     const inspectionPassed = today.getTime() > INSPECTION_DATE.getTime() + 12 * 60 * 60 * 1000;
     const activeDayRef = useRef(activeDay);
     const catchUpModeRef = useRef(catchUpMode);
     const completedRef = useRef(completed);
-    useEffect(() => { activeDayRef.current = activeDay; }, [activeDay]);
-    useEffect(() => { catchUpModeRef.current = catchUpMode; }, [catchUpMode]);
+    useEffect(() => { activeDayRef.current = activeDay; settingsValueRef.current.activeDay = activeDay; }, [activeDay]);
+    useEffect(() => { catchUpModeRef.current = catchUpMode; settingsValueRef.current.catchUpMode = catchUpMode; }, [catchUpMode]);
     useEffect(() => { completedRef.current = completed; }, [completed]);
-    const blobUrl = blobId ? `${JSONBLOB_API}/${blobId}` : null;
+    const blobUrl = blobId ? `${SYNC_API}?list=${encodeURIComponent(blobId)}` : null;
     const createBlob = useCallback(async () => {
         try {
             setSyncStatus("syncing");
             setBlobError("");
-            const initialState = { completed: buildPreloaded(), activeDay: 1, catchUpMode: false, createdAt: new Date().toISOString() };
-            const res = await fetchWithTimeout(JSONBLOB_API, {
+            const settingsAt = new Date().toISOString();
+            const initialState = {
+                completed: buildPreloaded(),
+                activeDay: 1,
+                catchUpMode: false,
+                customTasks: [],
+                settingsAt,
+                createdAt: settingsAt,
+            };
+            const res = await fetchWithTimeout(SYNC_API + "?action=create", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Accept": "application/json" },
-                body: JSON.stringify(initialState),
+                body: JSON.stringify({ state: initialState }),
             });
-            if (!res.ok)
-                throw new Error(`HTTP ${res.status}`);
-            const location = res.headers.get("Location") || res.headers.get("location");
-            let newId = "";
-            if (location) {
-                const parts = location.split("/");
-                newId = parts[parts.length - 1];
+            if (!res.ok) {
+                const body = await res.text().catch(() => "");
+                throw new Error(`HTTP ${res.status}${body ? " " + body.slice(0, 160) : ""}`);
             }
-            if (!newId) {
-                const data = await res.json().catch(() => null);
-                if (data && data.id)
-                    newId = data.id;
-            }
+            const data = await res.json();
+            const newId = data && data.listId;
             if (!newId)
-                throw new Error("Could not determine new blob ID");
+                throw new Error("Could not determine new shared-list ID");
             setBlobId(newId);
             setCompleted(buildPreloaded());
-            // We just created this blob, so we definitively know its contents — writes are safe.
+            setCustomTasks([]);
+            setActiveDay(1);
+            setCatchUpMode(false);
+            activeDayRef.current = 1;
+            catchUpModeRef.current = false;
+            settingsValueRef.current = { activeDay: 1, catchUpMode: false };
+            settingsStampRef.current = settingsAt;
             hasLoadedOnceRef.current = true;
             setHasLoadedOnce(true);
             setShowBlobSetup(false);
+            writeLocalCache(newId, Object.assign({}, initialState));
             try {
                 const url = new URL(window.location.href);
                 url.searchParams.set(BLOB_ID_PARAM, newId);
@@ -662,8 +679,6 @@ function App() {
     const loadShared = useCallback(async () => {
         if (!blobUrl)
             return;
-        if (writeQueueRef.current)
-            return;
         try {
             setSyncStatus("syncing");
             const res = await fetchWithTimeout(blobUrl, {
@@ -676,85 +691,94 @@ function App() {
                     setSyncStatus("error");
                     return;
                 }
-                throw new Error(`HTTP ${res.status}`);
+                const body = await res.text().catch(() => "");
+                throw new Error(`HTTP ${res.status}${body ? " " + body.slice(0, 160) : ""}`);
             }
-            const data = await res.json();
+            const response = await res.json();
+            const data = (response && response.state) || response || {};
             const incomingCompleted = data.completed || {};
             const incomingDay = typeof data.activeDay === "number" ? data.activeDay : 1;
             const incomingCatchUp = !!data.catchUpMode;
-            const incomingCustom = Array.isArray(data.customTasks) ? data.customTasks : [];
-            // Union custom tasks by id so simultaneous additions from two phones both survive
-            const customById = {};
-            incomingCustom.forEach(t => { if (t && t.id)
-                customById[t.id] = t; });
-            (customTasksRef.current || []).forEach(t => { if (t && t.id && !customById[t.id])
-                customById[t.id] = t; });
-            const mergedCustom = Object.values(customById).filter(t => !t.deleted);
-            const localCompleted = completedRef.current;
+            const incomingSettingsAt = data.settingsAt || "";
+            const incomingCustom = normalizeCustomTasks(data.customTasks || [], data.updatedAt || data.createdAt);
+
+            // If the user tapped before the first network read completed, saveShared()
+            // kept an exact pending snapshot. Merge from that snapshot rather than
+            // relying only on React refs, which can lag by one render.
+            const pending = pendingWriteRef.current;
+            const localCompleted = (pending && pending.completed) || completedRef.current || {};
+            const localCustom = normalizeCustomTasks((pending && pending.customTasks) || customTasksRef.current || [], pending && pending.updatedAt);
+            const localSettingsAt = (pending && pending.settingsAt) || settingsStampRef.current || "";
+            const localDay = pending && typeof pending.activeDay === "number" ? pending.activeDay : settingsValueRef.current.activeDay;
+            const localCatchUp = pending ? !!pending.catchUpMode : settingsValueRef.current.catchUpMode;
+
+            // Per-task merge. Missing keys never mean "delete"; only a newer timestamp
+            // for that exact task may replace its existing state.
             const merged = Object.assign({}, incomingCompleted);
             Object.keys(localCompleted).forEach(id => {
                 const local = localCompleted[id];
                 const remote = incomingCompleted[id];
-                if (!remote) {
+                if (!remote || ((local && local.at) && (!(remote && remote.at) || local.at > remote.at))) {
                     merged[id] = local;
-                }
-                else if (local.at && remote.at && new Date(local.at) > new Date(remote.at)) {
-                    merged[id] = local;
-                }
-                else {
-                    merged[id] = remote;
                 }
             });
-            // Day / catch-up mode: keep whichever change is newer rather than blindly
-            // taking the server's, so two people changing the day at once don't clobber.
-            const incomingSettingsAt = data.settingsAt || "";
-            const oursNewer = settingsStampRef.current && incomingSettingsAt &&
-                new Date(settingsStampRef.current) > new Date(incomingSettingsAt);
-            const useDay = oursNewer ? activeDayRef.current : incomingDay;
-            const useCatchUp = oursNewer ? catchUpModeRef.current : incomingCatchUp;
-            const mergedDiffersFromIncoming = JSON.stringify(merged) !== JSON.stringify(incomingCompleted);
-            const snapshot = JSON.stringify({ c: merged, d: useDay, m: useCatchUp, x: mergedCustom });
-            if (snapshot !== lastSavedRef.current) {
-                setCompleted(merged);
-                setActiveDay(useDay);
-                setCatchUpMode(useCatchUp);
-                setCustomTasks(mergedCustom);
-                lastSavedRef.current = snapshot;
-                const customDiffers = JSON.stringify(mergedCustom) !== JSON.stringify(incomingCustom);
-                if ((mergedDiffersFromIncoming || oursNewer || customDiffers) && saveSharedRef.current) {
-                    saveSharedRef.current(merged, useDay, useCatchUp, mergedCustom);
+
+            // Custom tasks use tombstones (deleted:true), so an old phone cannot
+            // resurrect something that was deleted on another phone.
+            const customById = {};
+            incomingCustom.forEach(t => { customById[t.id] = t; });
+            localCustom.forEach(t => {
+                const remote = customById[t.id];
+                if (!remote || (t.updatedAt || "") > (remote.updatedAt || "")) {
+                    customById[t.id] = t;
                 }
-            }
-            // Successful sync — cache this confirmed state and clear the "showing cached data" flag
-            writeLocalCache(blobId, { completed: merged, activeDay: useDay, catchUpMode: useCatchUp, customTasks: mergedCustom });
+            });
+            const mergedCustom = Object.values(customById);
+
+            // Settings have their own timestamp. Checkbox saves do NOT refresh it.
+            const oursNewer = !!localSettingsAt &&
+                (!incomingSettingsAt || localSettingsAt > incomingSettingsAt);
+            const useDay = oursNewer ? localDay : incomingDay;
+            const useCatchUp = oursNewer ? localCatchUp : incomingCatchUp;
+            const useSettingsAt = oursNewer ? localSettingsAt : incomingSettingsAt;
+
+            activeDayRef.current = useDay;
+            catchUpModeRef.current = useCatchUp;
+            settingsValueRef.current = { activeDay: useDay, catchUpMode: useCatchUp };
+            settingsStampRef.current = useSettingsAt || settingsStampRef.current || "";
+            completedRef.current = merged;
+            customTasksRef.current = mergedCustom;
+            setCompleted(merged);
+            setActiveDay(useDay);
+            setCatchUpMode(useCatchUp);
+            setCustomTasks(mergedCustom);
+
+            const snapshot = JSON.stringify({ c: merged, d: useDay, m: useCatchUp, x: mergedCustom, s: settingsStampRef.current });
+            lastSavedRef.current = snapshot;
+            writeLocalCache(blobId, {
+                completed: merged,
+                activeDay: useDay,
+                catchUpMode: useCatchUp,
+                customTasks: mergedCustom,
+                settingsAt: settingsStampRef.current,
+            });
             setUsingCachedData(false);
             setDiag(d => (Object.assign(Object.assign({}, d), { reads: d.reads + 1, lastReadOk: new Date().toISOString(), lastError: "" })));
-            // We now know what the server holds, so writes are safe from here on.
+
             if (!hasLoadedOnceRef.current) {
                 hasLoadedOnceRef.current = true;
                 setHasLoadedOnce(true);
-                // If the user tapped while we were still loading, that change was held
-                // back. Merge it onto the freshly-loaded server state and send it now.
-                if (pendingWriteRef.current) {
-                    const held = pendingWriteRef.current;
-                    pendingWriteRef.current = null;
-                    const reconciled = Object.assign({}, merged);
-                    Object.keys(held.completed).forEach(id => {
-                        const heldEntry = held.completed[id];
-                        const serverEntry = merged[id];
-                        if (!serverEntry) {
-                            reconciled[id] = heldEntry;
-                        }
-                        else if (heldEntry.at && serverEntry.at && new Date(heldEntry.at) > new Date(serverEntry.at)) {
-                            reconciled[id] = heldEntry;
-                        }
-                    });
-                    setCompleted(reconciled);
-                    if (saveSharedRef.current) {
-                        saveSharedRef.current(reconciled, held.activeDay, held.catchUpMode);
-                    }
-                }
             }
+            pendingWriteRef.current = null;
+
+            // If this phone had newer offline changes, merge them back through the
+            // server-side atomic merge. This is safe: it cannot erase unrelated ticks.
+            const localDiffers = JSON.stringify(merged) !== JSON.stringify(incomingCompleted) ||
+                JSON.stringify(mergedCustom) !== JSON.stringify(incomingCustom) || oursNewer;
+            if (localDiffers && saveSharedRef.current) {
+                saveSharedRef.current(merged, useDay, useCatchUp, mergedCustom);
+            }
+
             setSyncStatus("idle");
             setLastSync(new Date());
             setBlobError("");
@@ -766,56 +790,73 @@ function App() {
         }
     }, [blobUrl, blobId]);
     const saveShared = useCallback((nextCompleted, nextActiveDay, nextCatchUp, nextCustom) => {
-        const customToSave = nextCustom !== undefined ? nextCustom : customTasksRef.current;
         if (!blobUrl)
             return;
-        // Cache immediately on every local change, regardless of network — this is what
-        // protects against the "wiped to 0" problem when wifi drops right after a tick.
-        writeLocalCache(blobId, { completed: nextCompleted, activeDay: nextActiveDay, catchUpMode: nextCatchUp, customTasks: customToSave });
-        // SAFETY: never write to the shared server until we have confirmed what it
-        // already contains. Hold the change locally and flush it once the first
-        // successful load completes.
-        if (!hasLoadedOnceRef.current) {
-            pendingWriteRef.current = { completed: nextCompleted, activeDay: nextActiveDay, catchUpMode: nextCatchUp, customTasks: customToSave };
-            return;
+        const now = new Date().toISOString();
+        const customToSave = normalizeCustomTasks(nextCustom !== undefined ? nextCustom : customTasksRef.current, now);
+
+        // Only real day/catch-up changes advance settingsAt. Ordinary checkbox
+        // activity must never make stale settings appear newest.
+        const settingsChanged = nextActiveDay !== settingsValueRef.current.activeDay ||
+            nextCatchUp !== settingsValueRef.current.catchUpMode;
+        if (settingsChanged || !settingsStampRef.current) {
+            settingsStampRef.current = now;
         }
-        if (writeQueueRef.current)
-            clearTimeout(writeQueueRef.current);
-        const settingsStamp = new Date().toISOString();
-        settingsStampRef.current = settingsStamp;
+        settingsValueRef.current = { activeDay: nextActiveDay, catchUpMode: nextCatchUp };
+
         const payload = {
-            completed: nextCompleted,
+            completed: nextCompleted || {},
             activeDay: nextActiveDay,
             catchUpMode: nextCatchUp,
             customTasks: customToSave,
-            settingsAt: settingsStamp,
-            updatedAt: settingsStamp,
+            settingsAt: settingsStampRef.current,
+            updatedAt: now,
+            schemaVersion: 2,
         };
-        lastSavedRef.current = JSON.stringify({ c: nextCompleted, d: nextActiveDay, m: nextCatchUp, x: customToSave });
-        // Write with retries. Flaky wifi and free-tier hiccups are common, so a
-        // single failed PUT must not mean the change is silently lost.
+
+        // Cache first. A network failure must never make a local tap disappear.
+        writeLocalCache(blobId, payload);
+        lastSavedRef.current = JSON.stringify({ c: payload.completed, d: nextActiveDay, m: nextCatchUp, x: customToSave, s: payload.settingsAt });
+
+        // Hold offline/startup changes until we have read the shared state once.
+        if (!hasLoadedOnceRef.current) {
+            pendingWriteRef.current = payload;
+            return;
+        }
+
+        if (writeQueueRef.current)
+            clearTimeout(writeQueueRef.current);
+        const generation = ++writeGenerationRef.current;
+
+        // The server performs an atomic, per-item timestamp merge. Retrying an old
+        // snapshot therefore cannot wipe newer ticks from another phone.
         const attemptWrite = async (attempt) => {
+            if (generation !== writeGenerationRef.current)
+                return;
             try {
                 setSyncStatus("syncing");
-                const res = await fetchWithTimeout(blobUrl, {
-                    method: "PUT",
+                const res = await fetchWithTimeout(SYNC_API, {
+                    method: "POST",
                     headers: { "Content-Type": "application/json", "Accept": "application/json" },
-                    body: JSON.stringify(payload),
+                    body: JSON.stringify({ listId: blobId, state: payload }),
                 });
                 if (!res.ok) {
                     const body = await res.text().catch(() => "");
-                    throw new Error("HTTP " + res.status + (body ? " " + body.slice(0, 120) : ""));
+                    throw new Error("HTTP " + res.status + (body ? " " + body.slice(0, 160) : ""));
                 }
+                if (generation !== writeGenerationRef.current)
+                    return;
                 setSyncStatus("idle");
                 setLastSync(new Date());
                 setDiag(d => (Object.assign(Object.assign({}, d), { writes: d.writes + 1, lastWriteOk: new Date().toISOString(), lastError: "" })));
                 writeQueueRef.current = null;
             }
             catch (e) {
+                if (generation !== writeGenerationRef.current)
+                    return;
                 const msg = (e && e.message) || String(e);
                 setDiag(d => (Object.assign(Object.assign({}, d), { writeFails: d.writeFails + 1, lastError: "WRITE: " + msg, lastErrorAt: new Date().toISOString() })));
                 if (attempt < 4) {
-                    // 1s, 3s, 7s, 15s
                     const backoff = [1000, 3000, 7000, 15000][attempt] || 15000;
                     writeQueueRef.current = setTimeout(() => attemptWrite(attempt + 1), backoff);
                 }
@@ -825,12 +866,12 @@ function App() {
                 }
             }
         };
-        writeQueueRef.current = setTimeout(() => attemptWrite(0), 400);
+        writeQueueRef.current = setTimeout(() => attemptWrite(0), 250);
     }, [blobUrl, blobId]);
     useEffect(() => { saveSharedRef.current = saveShared; }, [saveShared]);
     // Adaptive polling: only sync while the page is actually visible, and slow
     // right down when nobody has touched the screen for a while. This keeps the
-    // request count to the free storage service low enough to avoid throttling.
+    // request count modest while keeping multiple phones reasonably fresh.
     const lastActivityRef = useRef(Date.now());
     useEffect(() => {
         const bump = () => { lastActivityRef.current = Date.now(); };
@@ -924,6 +965,8 @@ function App() {
             person: person || "shared",
             day: day,
             custom: true,
+            deleted: false,
+            updatedAt: new Date().toISOString(),
         };
         setCustomTasks(prev => {
             const next = [...prev, task];
@@ -933,7 +976,8 @@ function App() {
     }, [saveShared]);
     const deleteTask = useCallback((taskId) => {
         setCustomTasks(prev => {
-            const next = prev.filter(t => t.id !== taskId);
+            const now = new Date().toISOString();
+            const next = prev.map(t => t.id === taskId ? Object.assign({}, t, { deleted: true, updatedAt: now }) : t);
             saveShared(completedRef.current, activeDayRef.current, catchUpModeRef.current, next);
             return next;
         });
@@ -958,8 +1002,9 @@ function App() {
             return newDay;
         });
     }, [saveShared]);
+    const activeCustomTasks = useMemo(() => customTasks.filter(t => !t.deleted), [customTasks]);
     const stats = useMemo(() => {
-        const all = [...allTasksFlat(), ...customTasks];
+        const all = [...allTasksFlat(), ...activeCustomTasks];
         const total = all.length;
         const done = all.filter(t => { var _a; return (_a = completed[t.id]) === null || _a === void 0 ? void 0 : _a.done; }).length;
         const critical = all.filter(t => t.critical);
@@ -980,15 +1025,15 @@ function App() {
             };
         });
         return { total, done, criticalTotal: critical.length, criticalDone, byPerson, byDay };
-    }, [completed, customTasks]);
-    const advanceCheck = useMemo(() => criticalsDoneThrough(activeDay, completed, customTasks), [activeDay, completed, customTasks]);
+    }, [completed, activeCustomTasks]);
+    const advanceCheck = useMemo(() => criticalsDoneThrough(activeDay, completed, activeCustomTasks), [activeDay, completed, activeCustomTasks]);
     const canAdvance = advanceCheck.complete && activeDay < DAYS.length;
     // Merge the fixed plan with any tasks people have added
     const DAYS_WITH_CUSTOM = useMemo(() => {
-        if (!customTasks.length)
+        if (!activeCustomTasks.length)
             return DAYS;
         return DAYS.map(d => {
-            const extras = customTasks.filter(t => t.day === d.day);
+            const extras = activeCustomTasks.filter(t => t.day === d.day);
             if (!extras.length)
                 return d;
             const tasks = Object.assign({}, d.tasks);
@@ -999,7 +1044,7 @@ function App() {
             });
             return Object.assign(Object.assign({}, d), { tasks });
         });
-    }, [customTasks]);
+    }, [activeCustomTasks]);
     const visibleDays = useMemo(() => {
         if (activeView === "today") {
             if (catchUpMode) {
@@ -1056,10 +1101,9 @@ function App() {
             return tasks;
         return { [activePerson]: tasks[activePerson] || [] };
     };
-    // --- Backup / restore / force-push -------------------------------------
+    // --- Backup / restore / manual retry ------------------------------------
     const onForcePush = useCallback(() => {
-        // Bypass the debounce and push whatever this phone currently holds.
-        hasLoadedOnceRef.current = true;
+        // Safe retry only. This never bypasses the initial-read guard.
         saveShared(completedRef.current, activeDayRef.current, catchUpModeRef.current, customTasksRef.current || []);
         setShowDiag(false);
     }, [saveShared]);
@@ -1071,6 +1115,8 @@ function App() {
             activeDay: activeDayRef.current,
             catchUpMode: catchUpModeRef.current,
             customTasks: customTasksRef.current || [],
+            settingsAt: settingsStampRef.current || "",
+            schemaVersion: 2,
         });
         try {
             navigator.clipboard.writeText(payload);
@@ -1107,11 +1153,14 @@ function App() {
                 }
             });
             const day = typeof parsed.activeDay === "number" ? parsed.activeDay : activeDayRef.current;
-            const custom = Array.isArray(parsed.customTasks) ? parsed.customTasks : (customTasksRef.current || []);
+            const custom = normalizeCustomTasks(Array.isArray(parsed.customTasks) ? parsed.customTasks : (customTasksRef.current || []), parsed.savedAt);
+            completedRef.current = base;
+            customTasksRef.current = custom;
+            activeDayRef.current = day;
+            settingsValueRef.current = { activeDay: day, catchUpMode: catchUpModeRef.current };
             setCompleted(base);
             setActiveDay(day);
             setCustomTasks(custom);
-            hasLoadedOnceRef.current = true;
             saveShared(base, day, catchUpModeRef.current, custom);
             setShowDiag(false);
         }
@@ -1293,7 +1342,7 @@ function App() {
                         blobId || "(none)")),
                 diag.lastError && (React.createElement("div", { className: "mt-3 p-3 rounded-xl text-[11px] font-mono", style: { background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#fca5a5", wordBreak: "break-word" } }, diag.lastError)),
                 React.createElement("button", { onClick: () => { setShowDiag(false); loadShared(); }, className: "w-full mt-4 py-3 rounded-xl text-sm font-semibold", style: { background: "linear-gradient(135deg,#ec4899,#a855f7)", color: "#fff" } }, "Sync now (fetch latest)"),
-                React.createElement("button", { onClick: () => { onForcePush(); }, className: "w-full mt-2 py-3 rounded-xl text-sm font-semibold", style: { background: "rgba(59,130,246,0.9)", color: "#fff" } }, "Force send my ticks to the list"),
+                React.createElement("button", { onClick: () => { onForcePush(); }, className: "w-full mt-2 py-3 rounded-xl text-sm font-semibold", style: { background: "rgba(59,130,246,0.9)", color: "#fff" } }, "Retry sending my changes"),
                 React.createElement("div", { className: "mt-3 pt-3", style: { borderTop: "1px solid rgba(255,255,255,0.08)" } },
                     React.createElement("div", { className: "text-[10px] uppercase tracking-[0.15em] opacity-50 mb-2" }, "Backup"),
                     React.createElement("button", { onClick: onCopyBackup, className: "w-full py-3 rounded-xl text-sm font-semibold", style: { background: backupCopied ? "#10b981" : "rgba(255,255,255,0.08)", color: "#fff", border: "1px solid rgba(255,255,255,0.1)" } }, backupCopied ? "Copied — paste it somewhere safe" : "Copy backup of all ticks"),
@@ -1670,18 +1719,13 @@ function BlobSetupScreen({ onCreate, onJoin, error, syncing }) {
                     border: "1px solid rgba(239,68,68,0.3)",
                     color: "#fca5a5",
                 } }, error)),
-            React.createElement("div", { className: "mt-10 text-[10px] opacity-40 leading-relaxed" }, "Data is stored on jsonblob.com \u2014 a free public service. The code acts like a password."))));
+            React.createElement("div", { className: "mt-10 text-[10px] opacity-40 leading-relaxed" }, "Shared checklist data is stored in the app database. Anyone with the link or code can edit."))));
 }
+var boot=document.getElementById("boot"); if(boot) boot.style.display="none";
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App, null));
-
-
-window.__startApp = function(){
-  try {
-    var boot=document.getElementById("boot"); if(boot) boot.style.display="none";
-    ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
-  } catch (err) {
-    showErr("STARTUP FAILED:\n" + ((err && (err.stack || err.message)) || err));
-  }
+} catch (err) {
+  showErr("STARTUP FAILED:\n" + ((err && (err.stack || err.message)) || err));
+}
 };
 window.__bootReact();
 </script>
